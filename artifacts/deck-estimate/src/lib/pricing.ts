@@ -45,15 +45,12 @@ export interface EstimateState {
 }
 
 export const BASE_RATES = {
-  ledger: 28, // per LF
-  framing: 22, // per LF
+  ledger: 28,   // per LF
+  framing: 22,  // per LF
   deckArea: 42, // per SqFt
-  rail8: 285, // each
-  rail10: 345, // each
-  stair6: 195, // each
-  stair8: 245, // each
-  stair10: 295, // each
 };
+
+export const RAILING_RATE = 98; // per Linear Foot (all railing types)
 
 export const TIER_MULTIPLIERS: Record<MaterialTier, number> = {
   basic: 1.0,
@@ -104,6 +101,7 @@ export interface PricingBreakdown {
   totalDeckSqFt: number;
   totalLf: number;
   totalLedgerLf: number;
+  totalRailingLf: number;
   lumberCounts: LumberCounts;
 }
 
@@ -139,13 +137,25 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
   addMeasurementItem('ledger', 'Ledger (Linear Ft)', sumArray(m.ledger), BASE_RATES.ledger);
   addMeasurementItem('framing', 'Framing/Ridge (Linear Ft)', totalLf, BASE_RATES.framing);
   addMeasurementItem('deckArea', `Deck Surface (Sq Ft) - ${state.materialTier.charAt(0).toUpperCase() + state.materialTier.slice(1)}`, totalDeckSqFt, BASE_RATES.deckArea, true);
-  
-  addMeasurementItem('rail8', '8ft Flat Railing Section', sumArray(m.rail8), BASE_RATES.rail8);
-  addMeasurementItem('rail10', '10ft Flat Railing Section', sumArray(m.rail10), BASE_RATES.rail10);
-  
-  addMeasurementItem('stair6', '6ft Stair Diagonal Railing', sumArray(m.stair6), BASE_RATES.stair6);
-  addMeasurementItem('stair8', '8ft Stair Diagonal Railing', sumArray(m.stair8), BASE_RATES.stair8);
-  addMeasurementItem('stair10', '10ft Stair Diagonal Railing', sumArray(m.stair10), BASE_RATES.stair10);
+
+  // Railing: all sections converted to linear feet × $98/LF
+  const totalRailingLf =
+    sumArray(m.rail8)  * 8  +
+    sumArray(m.rail10) * 10 +
+    sumArray(m.stair6) * 6  +
+    sumArray(m.stair8) * 8  +
+    sumArray(m.stair10) * 10;
+
+  if (totalRailingLf > 0) {
+    lineItems.push({
+      id: 'railing',
+      name: 'Railing (Linear Ft)',
+      qty: totalRailingLf,
+      unitPrice: RAILING_RATE,
+      total: totalRailingLf * RAILING_RATE,
+      type: 'measurement',
+    });
+  }
 
   // 2. Add-ons
   state.addons.forEach(addon => {
@@ -207,6 +217,7 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     totalDeckSqFt,
     totalLf,
     totalLedgerLf,
+    totalRailingLf,
     lumberCounts,
   };
 }

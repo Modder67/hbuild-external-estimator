@@ -5,7 +5,7 @@ import {
   Ruler, ChevronDown, Check, Download, AlertCircle
 } from 'lucide-react';
 import { useEstimateForm } from '@/hooks/useEstimateForm';
-import { calculatePricing, formatCurrency, MeasurementType } from '@/lib/pricing';
+import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, sumArray } from '@/lib/pricing';
 import { generateEstimatePDF } from '@/lib/pdfExport';
 import { useToast } from '@/hooks/use-toast';
 
@@ -241,6 +241,26 @@ export default function EstimateBuilder() {
                   </div>
                 )}
               </div>
+
+              {/* Railing Total Summary */}
+              {pricing.totalRailingLf > 0 && (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-10 bg-primary rounded-full" />
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Railing</p>
+                      <p className="text-lg font-bold text-foreground font-mono">
+                        {pricing.totalRailingLf} LF
+                        <span className="text-sm font-normal text-muted-foreground ml-2">× ${RAILING_RATE}/LF</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Railing Subtotal</p>
+                    <p className="text-2xl font-display font-bold text-primary">{formatCurrency(pricing.totalRailingLf * RAILING_RATE)}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
           </CardContent>
