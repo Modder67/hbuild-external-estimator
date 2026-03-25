@@ -1,0 +1,87 @@
+You are building a professional web app for HBuild, a real Colorado-based deck remodeling company (Highlands Ranch / Littleton / Parker area) that specializes in fast, accurate on-site estimates during in-home sales consultations.
+
+App Name: Deck Remodel Pros – Instant Estimate Builder
+
+Color Scheme (use exactly):
+- Gold accent: #e9cc79
+- Deep bronze: #b2802d
+- Background / text: Black (#111111) and White (#ffffff)
+
+The app must feel like a digital version of a professional paper sales form, but super fast and mobile-first for salespeople standing in a customer’s backyard. Goal: allow a salesperson to produce a complete, professional-looking estimate in under 2 minutes.
+
+Core Purpose: Rapidly create a detailed deck remodel estimate based on real-world bidding measurements that are most important for accurate invoicing and profitable jobs. The most critical items we bid on are:
+- Ledger linear feet (framing attachment to house)
+- Total linear feet of deck perimeter / framing
+- Deck surface area in square feet (decking + under-decking labor)
+- Railing sections (pre-built 8 ft and 10 ft panels)
+- Stair diagonal railing (6 ft, 8 ft, 10 ft sections)
+
+Main Features & Flow:
+
+1. **Job Header**
+   - Salesperson name (auto-filled or editable)
+   - Customer name & address
+   - Date (auto today)
+   - Job title (e.g., “Full Deck Remodel with Railing”)
+
+2. **Measurement Section** (this is the heart of the app – make it lightning fast)
+   - Ledger Linear Ft → number input + “+” button to add multiple ledger segments (e.g., house + garage)
+   - Total Linear Ft (Ridge/framing) → number input + “+” button for additional runs
+   - Square Feet (deck surface) → number input + “+” button for multiple deck areas (main deck + upper deck + lower deck, etc.)
+   - Railing Count:
+     - 8 ft sections → number input
+     - 10 ft sections → number input
+   - Stair Diagonal Railing Count:
+     - 6 ft sections → number input
+     - 8 ft sections → number input
+     - 10 ft sections → number input
+
+   Every time the user clicks the “+” icon it adds a new labeled row so they can break down irregular shapes (exactly like a paper form).
+
+3. **Decking Material Tier** (very important for accurate pricing)
+   - Dropdown: 
+     - $   Basic Composite (entry level)
+     - $$  Premium Composite
+     - $$$ Luxury Composite / Exotic
+
+4. **Optional Add-Ons** (quick checkboxes with default prices the salesperson can override)
+   - Stairs (number of steps)
+   - Post Footings / Concrete
+   - Lighting Package
+   - Under-Deck Ceiling
+   - Privacy Screen / Lattice
+   - Custom Stain / Paint
+   - Removal of Old Deck
+
+*** Each Estimate will have 3 Markups 52%, 42%, 37%
+5. **Live Pricing Engine**
+   - The app automatically calculates a subtotal, tax, and grand total based on the measurements and tier selected.
+   - Show a clean breakdown table on the right or below (Ledger LF × rate, Sq Ft × rate, Railing sections × rate, etc.).
+   - Display “Estimated Total” in large bold gold font.
+
+6. **Estimate Summary & PDF Export**
+   - One big “Generate Professional Estimate” button
+   - Generates a beautiful PDF (branded with our logo, gold/bronze colors, company name “Deck Remodel Pros”, phone, website)
+   - PDF must include:
+     - Company Logo
+     - Customer info
+     - All measurements entered
+     - Itemized cost breakdown
+     - Grand total
+     - Validity date (30 days)
+     - “Thank you – Let’s build your dream deck!” message
+   - PDF must be downloadable instantly and look like a high-end contractor proposal.
+
+Technical & UX Requirements:
+- Fully mobile-first, big buttons, works perfectly on phones and tablets
+- Use localStorage so the form doesn’t lose data if the page refreshes
+- Clean card-based layout with subtle shadows
+- Professional construction vibe with subtle emojis (📏 🏠 🛠️)
+- Success animations when measurements are added or PDF is generated
+- All code in one clean, well-commented HTML/CSS/JS file (or React if Lovable prefers) that can run immediately
+- Make the pricing logic realistic based on typical Colorado deck pricing (you can use placeholder rates that we can edit later)
+
+This app is used daily by our sales team during in-home consultations to close deals on the spot. Speed and accuracy are everything.
+
+Generate the complete working app now.
+

@@ -1,0 +1,10 @@
+packages:
+  "jspdf": "PDF generation for estimates"
+  "jspdf-autotable": "Table rendering within PDFs"
+  "framer-motion": "Smooth animations for adding rows and layout changes"
+  "date-fns": "Easy date formatting for the UI and PDF"
+  "lucide-react": "Icons for the interface"
+
+notes:
+  - This is a fully frontend client-side application.
+  - No API integration required. All state persists in localStorage.
