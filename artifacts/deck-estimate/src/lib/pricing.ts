@@ -53,13 +53,18 @@ export interface EstimateState {
   selectedMarkup: 'good' | 'better' | 'best';
 }
 
+// Per-unit base prices from pricing sheet (before markup tiers)
 export const BASE_RATES = {
-  ledger: 28,   // per LF
-  framing: 22,  // per LF
-  deckArea: 42, // per SqFt
+  ledger:       45.80,  // per LF
+  framing:      67.10,  // per LF  (Rim Board)
+  pictureFrame: 26.80,  // per LF  (Square Edge / Picture Frame)
+  deckBoard:   199.50,  // per board — qty = ceil(sqft × 0.1410)
+  beam:        114.00,  // per LF  (Beam Replacement/Installation)
+  postCount:   562.00,  // per EA
+  caissons:    925.00,  // per EA
 };
 
-export const RAILING_RATE = 98; // per Linear Foot (all railing types)
+export const RAILING_RATE = 146; // per Linear Foot (all railing types)
 
 export const TIER_MULTIPLIERS: Record<MaterialTier, number> = {
   basic: 1.0,
@@ -93,9 +98,9 @@ export interface LineItem {
 }
 
 export interface LumberCounts {
-  ledger2x10x20: number;   // 2x10x20 boards for ledger (1 per 20 LF)
-  framing2x12x16: number;  // 2x12x16 boards for framing (1 per 16 LF)
-  deck075x55x20: number;   // 0.75x5.5x20 deck boards ((5.5/12)*20 = 9.167 sqft each)
+  ledger2x10x20: number;   // 2×10×20 boards for ledger (1 per 20 LF)
+  framing2x12x16: number;  // 2×12×16 boards for framing (1 per 16 LF)
+  deck075x55x20: number;   // 0.75×5.5×20 deck boards (sqft × 0.1410)
 }
 
 export interface PricingBreakdown {
@@ -108,6 +113,7 @@ export interface PricingBreakdown {
     best: number;
   };
   totalDeckSqFt: number;
+  totalDeckBoards: number;
   totalLf: number;
   totalLedgerLf: number;
   totalRailingLf: number;
@@ -121,33 +127,47 @@ export function sumArray(arr: number[]): number {
 export function calculatePricing(state: EstimateState): PricingBreakdown {
   const lineItems: LineItem[] = [];
   
-  // Calculate Totals for Dependencies
   const totalDeckSqFt = sumArray(state.measurements.deckArea);
-  const totalLf = sumArray(state.measurements.framing); // Assuming Total LF is framing/perimeter
+  const totalDeckBoards = totalDeckSqFt > 0 ? Math.ceil(totalDeckSqFt * 0.1410) : 0;
+  const totalLedgerLf = sumArray(state.measurements.ledger);
+  const totalLf = sumArray(state.measurements.framing);
   const materialMultiplier = TIER_MULTIPLIERS[state.materialTier];
-
-  // 1. Measurements
   const m = state.measurements;
-  
-  const addMeasurementItem = (id: string, name: string, qty: number, basePrice: number, applyMultiplier = false) => {
+
+  const addItem = (id: string, name: string, qty: number, unitPrice: number, applyTier = false) => {
     if (qty > 0) {
-      const unitPrice = applyMultiplier ? basePrice * materialMultiplier : basePrice;
-      lineItems.push({
-        id,
-        name,
-        qty,
-        unitPrice,
-        total: qty * unitPrice,
-        type: 'measurement'
-      });
+      const price = applyTier ? unitPrice * materialMultiplier : unitPrice;
+      lineItems.push({ id, name, qty, unitPrice: price, total: qty * price, type: 'measurement' });
     }
   };
 
-  addMeasurementItem('ledger', 'Ledger (Linear Ft)', sumArray(m.ledger), BASE_RATES.ledger);
-  addMeasurementItem('framing', 'Framing/Ridge (Linear Ft)', totalLf, BASE_RATES.framing);
-  addMeasurementItem('deckArea', `Deck Surface (Sq Ft) - ${state.materialTier.charAt(0).toUpperCase() + state.materialTier.slice(1)}`, totalDeckSqFt, BASE_RATES.deckArea, true);
+  // Ledger Board: $45.80/LF
+  addItem('ledger', 'Ledger Board (Linear Ft)', totalLedgerLf, BASE_RATES.ledger);
 
-  // Railing: all sections converted to linear feet × $98/LF
+  // Framing / Rim Board: $67.10/LF
+  addItem('framing', 'Framing / Rim Board (Linear Ft)', totalLf, BASE_RATES.framing);
+
+  // Square Edge / Picture Frame: $26.80/LF
+  const totalPictureFrameLf = sumArray(m.pictureFrame);
+  addItem('pictureFrame', 'Square Edge / Picture Frame (Linear Ft)', totalPictureFrameLf, BASE_RATES.pictureFrame);
+
+  // Deck Boards: ceil(sqft × 0.1410) boards × $199.50 × tier multiplier
+  const tierLabel = state.materialTier.charAt(0).toUpperCase() + state.materialTier.slice(1);
+  addItem('deckArea', `Deck Boards (${totalDeckSqFt} sqft → ${totalDeckBoards} boards) – ${tierLabel}`, totalDeckBoards, BASE_RATES.deckBoard, true);
+
+  // Beam Replacement/Installation: $114/LF
+  const totalBeamLf = sumArray(m.beam);
+  addItem('beam', 'Beam Replacement / Installation (Linear Ft)', totalBeamLf, BASE_RATES.beam);
+
+  // Post Count: $562/EA
+  const totalPosts = sumArray(m.postCount);
+  addItem('postCount', 'Post Count (Each)', totalPosts, BASE_RATES.postCount);
+
+  // Caissons: $925/EA
+  const totalCaissons = sumArray(m.caissons);
+  addItem('caissons', 'Caissons (Each)', totalCaissons, BASE_RATES.caissons);
+
+  // Railing: all sections converted to linear feet × $146/LF
   const totalRailingLf =
     sumArray(m.rail8)  * 8  +
     sumArray(m.rail10) * 10 +
@@ -166,23 +186,14 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     });
   }
 
-  // 2. Add-ons
+  // Add-ons
   state.addons.forEach(addon => {
     if (addon.enabled) {
       let qty = addon.qty;
       let unit = 'ea';
-      
-      if (addon.isFlat) {
-        qty = 1;
-        unit = 'flat';
-      } else if (addon.isPerSqFt) {
-        qty = totalDeckSqFt;
-        unit = 'sq ft';
-      } else if (addon.isPerLf) {
-        qty = addon.qty; // User provides LF for privacy screen usually, or it could be derived. Assuming user provided.
-        unit = 'LF';
-      }
-
+      if (addon.isFlat) { qty = 1; unit = 'flat'; }
+      else if (addon.isPerSqFt) { qty = totalDeckSqFt; unit = 'sq ft'; }
+      else if (addon.isPerLf) { unit = 'LF'; }
       if (qty > 0) {
         lineItems.push({
           id: addon.id,
@@ -190,32 +201,26 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
           qty,
           unitPrice: addon.priceOverride,
           total: qty * addon.priceOverride,
-          type: 'addon'
+          type: 'addon',
         });
       }
     }
   });
 
-  // Calculate Subtotal
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
-  
-  // Tax (8.5%)
   const tax = subtotal * 0.085;
   const costTotal = subtotal + tax;
 
-  // Markups
   const totals = {
-    good: costTotal * (1 + MARKUP_RATES.good),
+    good:   costTotal * (1 + MARKUP_RATES.good),
     better: costTotal * (1 + MARKUP_RATES.better),
-    best: costTotal * (1 + MARKUP_RATES.best),
+    best:   costTotal * (1 + MARKUP_RATES.best),
   };
 
-  // Lumber count calculations
-  const totalLedgerLf = sumArray(m.ledger);
   const lumberCounts: LumberCounts = {
-    ledger2x10x20: totalLedgerLf > 0 ? Math.ceil(totalLedgerLf / 20) : 0,
-    framing2x12x16: totalLf > 0 ? Math.ceil(totalLf / 16) : 0,
-    deck075x55x20: totalDeckSqFt > 0 ? Math.ceil(totalDeckSqFt * 0.1410) : 0,
+    ledger2x10x20:  totalLedgerLf > 0  ? Math.ceil(totalLedgerLf / 20) : 0,
+    framing2x12x16: totalLf > 0        ? Math.ceil(totalLf / 16) : 0,
+    deck075x55x20:  totalDeckBoards,
   };
 
   return {
@@ -224,6 +229,7 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     tax,
     totals,
     totalDeckSqFt,
+    totalDeckBoards,
     totalLf,
     totalLedgerLf,
     totalRailingLf,
