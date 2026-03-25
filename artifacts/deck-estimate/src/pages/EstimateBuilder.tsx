@@ -174,6 +174,17 @@ export default function EstimateBuilder() {
               />
 
               <MeasurementGroup 
+                title="Square Edge / Picture Frame" 
+                icon={<Ruler className="w-4 h-4" />}
+                type="pictureFrame" 
+                state={state} 
+                unit="Linear Ft"
+                updateMeasurement={updateMeasurement} 
+                addMeasurementSegment={addMeasurementSegment}
+                removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              <MeasurementGroup 
                 title="Deck Surface Area" 
                 icon={<Grid3X3 className="w-4 h-4" />}
                 type="deckArea" 

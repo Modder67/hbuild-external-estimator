@@ -1,6 +1,7 @@
 export type MeasurementType = 
   | 'ledger' 
-  | 'framing' 
+  | 'framing'
+  | 'pictureFrame'
   | 'deckArea'
   | 'joistCount'
   | 'beam'

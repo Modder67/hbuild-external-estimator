@@ -15,6 +15,7 @@ const defaultState: EstimateState = {
   measurements: {
     ledger: [0],
     framing: [0],
+    pictureFrame: [0],
     deckArea: [0],
     beam: [0],
     postCount: [0],
