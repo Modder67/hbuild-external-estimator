@@ -185,11 +185,10 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
 
   // Lumber count calculations
   const totalLedgerLf = sumArray(m.ledger);
-  const DECK_BOARD_COVERAGE_SQFT = (5.5 / 12) * 20; // 0.75x5.5x20 covers ~9.167 sqft each
   const lumberCounts: LumberCounts = {
     ledger2x10x20: totalLedgerLf > 0 ? Math.ceil(totalLedgerLf / 20) : 0,
     framing2x12x16: totalLf > 0 ? Math.ceil(totalLf / 16) : 0,
-    deck075x55x20: totalDeckSqFt > 0 ? Math.ceil(totalDeckSqFt / DECK_BOARD_COVERAGE_SQFT) : 0,
+    deck075x55x20: totalDeckSqFt > 0 ? Math.ceil(totalDeckSqFt * 0.1410) : 0,
   };
 
   return {
