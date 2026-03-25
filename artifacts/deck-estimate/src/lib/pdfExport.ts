@@ -56,6 +56,18 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
   doc.text(`Date: ${format(new Date(state.jobDetails.date || new Date()), 'MMMM d, yyyy')}`, pageWidth - 20, 65, { align: 'right' });
   doc.text(`Sales Representative: ${state.jobDetails.salesperson || 'Not specified'}`, pageWidth - 20, 72, { align: 'right' });
 
+  // === STAIR POSTS (if any) ===
+  const totalStairPosts = state.stairPosts.left + state.stairPosts.middle + state.stairPosts.right + state.stairPosts.center;
+  if (totalStairPosts > 0) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Stair Posts — Left: ${state.stairPosts.left}  Middle: ${state.stairPosts.middle}  Right: ${state.stairPosts.right}  Center: ${state.stairPosts.center}  (Total: ${totalStairPosts})`,
+      pageWidth / 2, 83, { align: 'center' }
+    );
+  }
+
   // === MATERIALS REQUIRED TABLE ===
   const { lumberCounts, totalLedgerLf, totalLf, totalDeckSqFt } = breakdown;
   const materialsData = [];

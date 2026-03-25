@@ -24,6 +24,7 @@ export default function EstimateBuilder() {
     updateMeasurement, 
     addMeasurementSegment, 
     removeMeasurementSegment,
+    updateStairPosts,
     setMaterialTier, 
     updateAddon, 
     setMarkup, 
@@ -203,6 +204,42 @@ export default function EstimateBuilder() {
                   <MeasurementGroup title="8ft Stair Diagonals" type="stair8" unit="Sections" state={state} updateMeasurement={updateMeasurement} addMeasurementSegment={addMeasurementSegment} removeMeasurementSegment={removeMeasurementSegment} />
                   <MeasurementGroup title="10ft Stair Diagonals" type="stair10" unit="Sections" state={state} updateMeasurement={updateMeasurement} addMeasurementSegment={addMeasurementSegment} removeMeasurementSegment={removeMeasurementSegment} />
                 </div>
+              </div>
+
+              {/* Stair Posts */}
+              <div className="bg-background border rounded-xl p-4 md:p-5 relative group overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+                <h3 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                  <Hammer className="w-4 h-4 text-muted-foreground" />
+                  Stair Posts
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {(['left', 'middle', 'right', 'center'] as const).map((pos) => (
+                    <div key={pos} className="space-y-2">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                        {pos.charAt(0).toUpperCase() + pos.slice(1)} QTY
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={state.stairPosts[pos] || ''}
+                        onChange={(e) => updateStairPosts(pos, e.target.value)}
+                        placeholder="0"
+                        className="bg-background/50 border-muted text-center font-mono text-lg h-12"
+                      />
+                    </div>
+                  ))}
+                </div>
+                {(state.stairPosts.left + state.stairPosts.middle + state.stairPosts.right + state.stairPosts.center) > 0 && (
+                  <div className="mt-3 flex justify-end">
+                    <div className="bg-muted px-3 py-1 rounded-md border border-border">
+                      <span className="text-sm text-muted-foreground mr-2">Total Posts:</span>
+                      <span className="font-mono font-bold text-primary">
+                        {state.stairPosts.left + state.stairPosts.middle + state.stairPosts.right + state.stairPosts.center}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -22,6 +22,13 @@ export interface AddonState {
   basePrice: number;
 }
 
+export interface StairPosts {
+  left: number;
+  middle: number;
+  right: number;
+  center: number;
+}
+
 export interface EstimateState {
   jobDetails: {
     salesperson: string;
@@ -31,6 +38,7 @@ export interface EstimateState {
     date: string;
   };
   measurements: Record<MeasurementType, number[]>;
+  stairPosts: StairPosts;
   materialTier: MaterialTier;
   addons: AddonState[];
   selectedMarkup: 'good' | 'better' | 'best';

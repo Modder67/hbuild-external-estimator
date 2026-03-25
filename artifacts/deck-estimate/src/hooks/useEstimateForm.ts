@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { EstimateState, DEFAULT_ADDONS, MeasurementType } from '@/lib/pricing';
+import { EstimateState, DEFAULT_ADDONS, MeasurementType, StairPosts } from '@/lib/pricing';
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'deck_remodel_pros_estimate_state';
@@ -22,6 +22,7 @@ const defaultState: EstimateState = {
     stair8: [0],
     stair10: [0],
   },
+  stairPosts: { left: 0, middle: 0, right: 0, center: 0 },
   materialTier: 'premium',
   addons: DEFAULT_ADDONS,
   selectedMarkup: 'better',
@@ -33,10 +34,10 @@ export function useEstimateForm() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Merge with default state to ensure all fields exist (e.g. if new addons were added)
         return {
           ...defaultState,
           ...parsed,
+          stairPosts: { ...defaultState.stairPosts, ...(parsed.stairPosts || {}) },
           addons: defaultState.addons.map(defaultAddon => {
             const storedAddon = parsed.addons?.find((a: any) => a.id === defaultAddon.id);
             return storedAddon ? { ...defaultAddon, ...storedAddon } : defaultAddon;
@@ -81,13 +82,19 @@ export function useEstimateForm() {
   const removeMeasurementSegment = (type: MeasurementType, index: number) => {
     setState(prev => {
       const newArr = prev.measurements[type].filter((_, i) => i !== index);
-      // Ensure at least one segment remains
       if (newArr.length === 0) newArr.push(0);
       return {
         ...prev,
         measurements: { ...prev.measurements, [type]: newArr }
       };
     });
+  };
+
+  const updateStairPosts = (field: keyof StairPosts, value: string) => {
+    setState(prev => ({
+      ...prev,
+      stairPosts: { ...prev.stairPosts, [field]: parseInt(value) || 0 }
+    }));
   };
 
   const setMaterialTier = (tier: EstimateState['materialTier']) => {
@@ -97,7 +104,7 @@ export function useEstimateForm() {
   const updateAddon = (id: string, updates: Partial<EstimateState['addons'][0]>) => {
     setState(prev => ({
       ...prev,
-      addons: prev.addons.map(addon => 
+      addons: prev.addons.map(addon =>
         addon.id === id ? { ...addon, ...updates } : addon
       )
     }));
@@ -111,7 +118,6 @@ export function useEstimateForm() {
     if (window.confirm("Are you sure you want to clear the entire form? This cannot be undone.")) {
       setState({
         ...defaultState,
-        // Preserve salesperson name
         jobDetails: {
           ...defaultState.jobDetails,
           salesperson: state.jobDetails.salesperson
@@ -126,6 +132,7 @@ export function useEstimateForm() {
     updateMeasurement,
     addMeasurementSegment,
     removeMeasurementSegment,
+    updateStairPosts,
     setMaterialTier,
     updateAddon,
     setMarkup,
