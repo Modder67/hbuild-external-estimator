@@ -371,7 +371,54 @@ export default function EstimateBuilder() {
                   </Table>
                 </div>
 
-                <div className="mt-6 space-y-3 px-4 sm:px-0">
+                {/* Lumber Materials Summary */}
+              {(pricing.lumberCounts.ledger2x10x20 > 0 || pricing.lumberCounts.framing2x12x16 > 0 || pricing.lumberCounts.deck075x55x20 > 0) && (
+                <div className="mt-6 mx-4 sm:mx-0 rounded-xl border border-amber-700/30 bg-amber-950/20 p-4">
+                  <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    🪵 Materials Required
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[380px]">
+                      <thead>
+                        <tr className="text-xs text-muted-foreground uppercase border-b border-border">
+                          <th className="text-left py-1.5 font-semibold">Component</th>
+                          <th className="text-center py-1.5 font-semibold">Lumber Size</th>
+                          <th className="text-right py-1.5 font-semibold">Measurement</th>
+                          <th className="text-center py-1.5 font-semibold text-amber-400">Qty to Order</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pricing.lumberCounts.ledger2x10x20 > 0 && (
+                          <tr className="border-b border-border/50">
+                            <td className="py-2 text-muted-foreground">Ledger Board</td>
+                            <td className="py-2 text-center font-mono font-bold text-foreground">2×10×20</td>
+                            <td className="py-2 text-right font-mono text-muted-foreground">{pricing.totalLedgerLf} LF</td>
+                            <td className="py-2 text-center font-bold text-amber-400 text-base">{pricing.lumberCounts.ledger2x10x20} pcs</td>
+                          </tr>
+                        )}
+                        {pricing.lumberCounts.framing2x12x16 > 0 && (
+                          <tr className="border-b border-border/50">
+                            <td className="py-2 text-muted-foreground">Framing / Perimeter</td>
+                            <td className="py-2 text-center font-mono font-bold text-foreground">2×12×16</td>
+                            <td className="py-2 text-right font-mono text-muted-foreground">{pricing.totalLf} LF</td>
+                            <td className="py-2 text-center font-bold text-amber-400 text-base">{pricing.lumberCounts.framing2x12x16} pcs</td>
+                          </tr>
+                        )}
+                        {pricing.lumberCounts.deck075x55x20 > 0 && (
+                          <tr>
+                            <td className="py-2 text-muted-foreground">Deck Surface</td>
+                            <td className="py-2 text-center font-mono font-bold text-foreground">¾×5½×20</td>
+                            <td className="py-2 text-right font-mono text-muted-foreground">{pricing.totalDeckSqFt} sq ft</td>
+                            <td className="py-2 text-center font-bold text-amber-400 text-base">{pricing.lumberCounts.deck075x55x20} pcs</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 space-y-3 px-4 sm:px-0">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal:</span>
                     <span className="font-mono">{formatCurrency(pricing.subtotal)}</span>

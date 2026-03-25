@@ -78,6 +78,12 @@ export interface LineItem {
   type: 'measurement' | 'addon';
 }
 
+export interface LumberCounts {
+  ledger2x10x20: number;   // 2x10x20 boards for ledger (1 per 20 LF)
+  framing2x12x16: number;  // 2x12x16 boards for framing (1 per 16 LF)
+  deck075x55x20: number;   // 0.75x5.5x20 deck boards ((5.5/12)*20 = 9.167 sqft each)
+}
+
 export interface PricingBreakdown {
   lineItems: LineItem[];
   subtotal: number;
@@ -89,6 +95,8 @@ export interface PricingBreakdown {
   };
   totalDeckSqFt: number;
   totalLf: number;
+  totalLedgerLf: number;
+  lumberCounts: LumberCounts;
 }
 
 export function sumArray(arr: number[]): number {
@@ -175,13 +183,24 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     best: costTotal * (1 + MARKUP_RATES.best),
   };
 
+  // Lumber count calculations
+  const totalLedgerLf = sumArray(m.ledger);
+  const DECK_BOARD_COVERAGE_SQFT = (5.5 / 12) * 20; // 0.75x5.5x20 covers ~9.167 sqft each
+  const lumberCounts: LumberCounts = {
+    ledger2x10x20: totalLedgerLf > 0 ? Math.ceil(totalLedgerLf / 20) : 0,
+    framing2x12x16: totalLf > 0 ? Math.ceil(totalLf / 16) : 0,
+    deck075x55x20: totalDeckSqFt > 0 ? Math.ceil(totalDeckSqFt / DECK_BOARD_COVERAGE_SQFT) : 0,
+  };
+
   return {
     lineItems,
     subtotal,
     tax,
     totals,
     totalDeckSqFt,
-    totalLf
+    totalLf,
+    totalLedgerLf,
+    lumberCounts,
   };
 }
 
