@@ -1,7 +1,8 @@
 export type MeasurementType = 
   | 'ledger' 
   | 'framing' 
-  | 'deckArea' 
+  | 'deckArea'
+  | 'joistCount'
   | 'beam'
   | 'postCount'
   | 'caissons'
@@ -10,6 +11,9 @@ export type MeasurementType =
   | 'stair6' 
   | 'stair8' 
   | 'stair10';
+
+export const JOIST_SIZES = ['2×6', '2×8', '2×10', '2×12'] as const;
+export type JoistSize = typeof JOIST_SIZES[number] | '';
 
 export type MaterialTier = 'basic' | 'premium' | 'luxury';
 
@@ -41,6 +45,7 @@ export interface EstimateState {
     date: string;
   };
   measurements: Record<MeasurementType, number[]>;
+  joistSize: JoistSize;
   stairPosts: StairPosts;
   materialTier: MaterialTier;
   addons: AddonState[];
