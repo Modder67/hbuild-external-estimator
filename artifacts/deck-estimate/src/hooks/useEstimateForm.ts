@@ -16,6 +16,9 @@ const defaultState: EstimateState = {
     ledger: [0],
     framing: [0],
     deckArea: [0],
+    beam: [0],
+    postCount: [0],
+    caissons: [0],
     rail8: [0],
     rail10: [0],
     stair6: [0],
@@ -37,6 +40,7 @@ export function useEstimateForm() {
         return {
           ...defaultState,
           ...parsed,
+          measurements: { ...defaultState.measurements, ...(parsed.measurements || {}) },
           stairPosts: { ...defaultState.stairPosts, ...(parsed.stairPosts || {}) },
           addons: defaultState.addons.map(defaultAddon => {
             const storedAddon = parsed.addons?.find((a: any) => a.id === defaultAddon.id);

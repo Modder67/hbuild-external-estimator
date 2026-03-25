@@ -183,6 +183,39 @@ export default function EstimateBuilder() {
                 addMeasurementSegment={addMeasurementSegment}
                 removeMeasurementSegment={removeMeasurementSegment}
               />
+
+              <MeasurementGroup 
+                title="Beam Replacement / Installation" 
+                icon={<Box className="w-4 h-4" />}
+                type="beam" 
+                state={state} 
+                unit="Linear Ft"
+                updateMeasurement={updateMeasurement} 
+                addMeasurementSegment={addMeasurementSegment}
+                removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              <MeasurementGroup 
+                title="Post Count" 
+                icon={<Ruler className="w-4 h-4" />}
+                type="postCount" 
+                state={state} 
+                unit="Each"
+                updateMeasurement={updateMeasurement} 
+                addMeasurementSegment={addMeasurementSegment}
+                removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              <MeasurementGroup 
+                title="Caissons" 
+                icon={<Hammer className="w-4 h-4" />}
+                type="caissons" 
+                state={state} 
+                unit="QTY"
+                updateMeasurement={updateMeasurement} 
+                addMeasurementSegment={addMeasurementSegment}
+                removeMeasurementSegment={removeMeasurementSegment}
+              />
             </div>
 
             <div className="h-px w-full bg-border"></div>
