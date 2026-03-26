@@ -3,7 +3,22 @@ import autoTable from 'jspdf-autotable';
 import { EstimateState, PricingBreakdown, formatCurrency } from './pricing';
 import { format } from 'date-fns';
 
-export function generateEstimatePDF(state: EstimateState, breakdown: PricingBreakdown) {
+export async function generateEstimatePDF(state: EstimateState, breakdown: PricingBreakdown) {
+  // Fetch logo as base64
+  let logoDataUrl: string | null = null;
+  try {
+    const res = await fetch('/hbuild-logo.png');
+    const blob = await res.blob();
+    logoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    // logo optional
+  }
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -19,42 +34,53 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
   
   // === HEADER ===
   doc.setFillColor(...darkColor);
-  doc.rect(0, 0, pageWidth, 40, 'F');
-  
+  doc.rect(0, 0, pageWidth, 44, 'F');
+
+  // Gold accent bar at top
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 0, pageWidth, 2, 'F');
+
+  // Logo
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', 13, 8, 16, 16);
+  }
+
+  // Company name
+  const textX = logoDataUrl ? 33 : 15;
   doc.setTextColor(...goldColor);
-  doc.setFontSize(28);
+  doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
-  doc.text('Deck Remodel Pros', 15, 20);
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
+  doc.text('HBUILD', textX, 18);
+
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Colorado\'s Premier Deck Specialists', 15, 28);
+  doc.text('Deck & Remodel Specialists', textX, 25);
   
   // Company Info (Right aligned)
-  doc.setFontSize(10);
-  doc.text('(720) 555-0100', pageWidth - 15, 16, { align: 'right' });
-  doc.text('www.deckremodelpros.com', pageWidth - 15, 22, { align: 'right' });
-  doc.text('Highlands Ranch / Littleton / Parker, CO', pageWidth - 15, 28, { align: 'right' });
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(9);
+  doc.text('303-356-1262', pageWidth - 15, 14, { align: 'right' });
+  doc.text('Colorado', pageWidth - 15, 20, { align: 'right' });
 
   // === CUSTOMER DETAILS BOX ===
   doc.setDrawColor(...bronzeColor);
   doc.setLineWidth(0.5);
   doc.setFillColor(250, 250, 250);
-  doc.rect(15, 45, pageWidth - 30, 40, 'FD');
+  doc.rect(15, 49, pageWidth - 30, 40, 'FD');
   
   doc.setTextColor(...darkColor);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(state.jobDetails.jobTitle || 'Deck Remodel Estimate', 20, 55);
+  doc.text(state.jobDetails.jobTitle || 'Deck Remodel Estimate', 20, 59);
   
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Customer: ${state.jobDetails.customerName || 'Not specified'}`, 20, 65);
-  doc.text(`Address: ${state.jobDetails.customerAddress || 'Not specified'}`, 20, 72);
+  doc.text(`Customer: ${state.jobDetails.customerName || 'Not specified'}`, 20, 69);
+  doc.text(`Address: ${state.jobDetails.customerAddress || 'Not specified'}`, 20, 76);
   
-  doc.text(`Date: ${format(new Date(state.jobDetails.date || new Date()), 'MMMM d, yyyy')}`, pageWidth - 20, 65, { align: 'right' });
-  doc.text(`Sales Representative: ${state.jobDetails.salesperson || 'Not specified'}`, pageWidth - 20, 72, { align: 'right' });
+  doc.text(`Date: ${format(new Date(state.jobDetails.date || new Date()), 'MMMM d, yyyy')}`, pageWidth - 20, 69, { align: 'right' });
+  doc.text(`Sales Representative: ${state.jobDetails.salesperson || 'Not specified'}`, pageWidth - 20, 76, { align: 'right' });
 
   // === STAIR POSTS (if any) ===
   const totalStairPosts = state.stairPosts.left + state.stairPosts.middle + state.stairPosts.right + state.stairPosts.center;
@@ -64,7 +90,7 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
     doc.setTextColor(100, 100, 100);
     doc.text(
       `Stair Posts — Left: ${state.stairPosts.left}  Middle: ${state.stairPosts.middle}  Right: ${state.stairPosts.right}  Center: ${state.stairPosts.center}  (Total: ${totalStairPosts})`,
-      pageWidth / 2, 83, { align: 'center' }
+      pageWidth / 2, 87, { align: 'center' }
     );
   }
 
@@ -128,7 +154,7 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
     });
   }
 
-  const materialsEndY = materialsData.length > 0 ? (doc as any).lastAutoTable.finalY + 8 : 90;
+  const materialsEndY = materialsData.length > 0 ? (doc as any).lastAutoTable.finalY + 8 : 94;
 
   // === CONTRACTOR-ONLY LUMBER COST TABLE ===
   const { lumber } = breakdown;
@@ -269,7 +295,7 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...darkColor);
-  doc.text('Thank you – Let\'s build your dream deck! | Deck Remodel Pros', pageWidth / 2, 280, { align: 'center' });
+  doc.text('Thank you – Let\'s build something great! | HBUILD | 303-356-1262', pageWidth / 2, 280, { align: 'center' });
 
   // Save the PDF
   const filename = `Estimate_${state.jobDetails.customerName?.replace(/\s+/g, '_') || 'Deck'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;

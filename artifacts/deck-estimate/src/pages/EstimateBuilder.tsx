@@ -38,7 +38,7 @@ export default function EstimateBuilder() {
 
   const pricing = useMemo(() => calculatePricing(state), [state]);
 
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     if (!state.jobDetails.customerName) {
       toast({
         title: "Missing Information",
@@ -49,7 +49,7 @@ export default function EstimateBuilder() {
     }
     
     try {
-      generateEstimatePDF(state, pricing);
+      await generateEstimatePDF(state, pricing);
       toast({
         title: "Success",
         description: "Professional estimate PDF generated successfully.",
@@ -66,20 +66,30 @@ export default function EstimateBuilder() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-32">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold text-primary">
-              Deck Remodel Pros
-            </h1>
-            <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-widest font-semibold mt-1">
-              Instant Estimate Builder
-            </p>
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/60 shadow-lg shadow-black/30">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img
+              src="/hbuild-logo.png"
+              alt="HBUILD Logo"
+              className="w-10 h-10 object-contain"
+            />
+            <div>
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-primary tracking-tight leading-none">
+                HBUILD
+              </h1>
+              <p className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-[0.2em] font-medium mt-0.5">
+                Instant Estimate Builder
+              </p>
+            </div>
           </div>
-          <Button variant="outline" size="sm" onClick={clearForm} className="text-muted-foreground hover:text-destructive transition-colors">
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear
-          </Button>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:block text-sm text-muted-foreground font-medium">303-356-1262</span>
+            <Button variant="outline" size="sm" onClick={clearForm} className="text-muted-foreground hover:text-destructive transition-colors">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear
+            </Button>
+          </div>
         </div>
       </header>
 
