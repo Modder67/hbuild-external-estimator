@@ -5,7 +5,7 @@ import {
   Ruler, ChevronDown, Check, Download, AlertCircle
 } from 'lucide-react';
 import { useEstimateForm } from '@/hooks/useEstimateForm';
-import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, sumArray } from '@/lib/pricing';
+import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, JOIST_SIZES, JoistSize, sumArray } from '@/lib/pricing';
 import { generateEstimatePDF } from '@/lib/pdfExport';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,7 @@ export default function EstimateBuilder() {
     addMeasurementSegment, 
     removeMeasurementSegment,
     updateStairPosts,
+    updateJoistSize,
     setMaterialTier, 
     updateAddon, 
     setMarkup, 
@@ -194,6 +195,55 @@ export default function EstimateBuilder() {
                 addMeasurementSegment={addMeasurementSegment}
                 removeMeasurementSegment={removeMeasurementSegment}
               />
+
+              {/* Floor Joists */}
+              <MeasurementGroup 
+                title="Floor Joists" 
+                icon={<Ruler className="w-4 h-4" />}
+                type="joistCount" 
+                state={state} 
+                unit="Each"
+                updateMeasurement={updateMeasurement} 
+                addMeasurementSegment={addMeasurementSegment}
+                removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              {/* Optional Existing Joist Size */}
+              <div className="bg-card/50 rounded-xl border border-border/50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Hammer className="w-4 h-4 text-primary" />
+                  <h4 className="font-semibold text-sm text-foreground">Existing Deck Joist Size</h4>
+                  <span className="ml-1 text-xs text-muted-foreground italic">(optional)</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {JOIST_SIZES.map(size => (
+                    <button
+                      key={size}
+                      onClick={() => updateJoistSize(state.joistSize === size ? '' : size as JoistSize)}
+                      className={`px-4 py-2 rounded-lg border text-sm font-mono font-semibold transition-all duration-150 ${
+                        state.joistSize === size
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background/50 border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                  {state.joistSize && (
+                    <button
+                      onClick={() => updateJoistSize('')}
+                      className="px-3 py-2 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-all"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {state.joistSize && (
+                  <p className="mt-2 text-xs text-primary font-medium">
+                    Selected: {state.joistSize} joists
+                  </p>
+                )}
+              </div>
 
               <MeasurementGroup 
                 title="Beam Replacement / Installation" 

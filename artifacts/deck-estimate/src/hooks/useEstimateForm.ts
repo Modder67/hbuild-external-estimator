@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { EstimateState, DEFAULT_ADDONS, MeasurementType, StairPosts } from '@/lib/pricing';
+import { EstimateState, DEFAULT_ADDONS, MeasurementType, StairPosts, JoistSize } from '@/lib/pricing';
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'deck_remodel_pros_estimate_state';
@@ -17,6 +17,7 @@ const defaultState: EstimateState = {
     framing: [0],
     pictureFrame: [0],
     deckArea: [0],
+    joistCount: [0],
     beam: [0],
     postCount: [0],
     caissons: [0],
@@ -26,6 +27,7 @@ const defaultState: EstimateState = {
     stair8: [0],
     stair10: [0],
   },
+  joistSize: '',
   stairPosts: { left: 0, middle: 0, right: 0, center: 0 },
   materialTier: 'premium',
   addons: DEFAULT_ADDONS,
@@ -102,6 +104,10 @@ export function useEstimateForm() {
     }));
   };
 
+  const updateJoistSize = (size: JoistSize) => {
+    setState(prev => ({ ...prev, joistSize: size }));
+  };
+
   const setMaterialTier = (tier: EstimateState['materialTier']) => {
     setState(prev => ({ ...prev, materialTier: tier }));
   };
@@ -138,6 +144,7 @@ export function useEstimateForm() {
     addMeasurementSegment,
     removeMeasurementSegment,
     updateStairPosts,
+    updateJoistSize,
     setMaterialTier,
     updateAddon,
     setMarkup,
