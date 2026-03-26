@@ -130,11 +130,78 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
 
   const materialsEndY = materialsData.length > 0 ? (doc as any).lastAutoTable.finalY + 8 : 90;
 
+  // === CONTRACTOR-ONLY LUMBER COST TABLE ===
+  const { lumber } = breakdown;
+  const lumberRows: string[][] = [];
+  if (lumber.ledger && lumber.ledger.qty > 0) {
+    lumberRows.push([
+      'Ledger Board',
+      lumber.ledger.option.label,
+      `${lumber.ledger.qty} ${lumber.ledger.option.unit === 'LFT' ? 'LFT' : 'pcs'}`,
+      formatCurrency(lumber.ledger.cost)
+    ]);
+  }
+  if (lumber.framing && lumber.framing.qty > 0) {
+    lumberRows.push([
+      'New Ledger (Framing)',
+      lumber.framing.option.label,
+      `${lumber.framing.qty} ${lumber.framing.option.unit === 'LFT' ? 'LFT' : 'pcs'}`,
+      formatCurrency(lumber.framing.cost)
+    ]);
+  }
+  if (lumber.joist && lumber.joist.qty > 0) {
+    lumberRows.push([
+      'Floor Joists',
+      lumber.joist.option.label,
+      `${lumber.joist.qty} ${lumber.joist.option.unit === 'LFT' ? 'LFT' : 'pcs'}`,
+      formatCurrency(lumber.joist.cost)
+    ]);
+  }
+
+  let lumberEndY = materialsEndY;
+  if (lumberRows.length > 0) {
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...([180, 100, 20] as [number, number, number]));
+    doc.text('[CONTRACTOR ONLY]  Lumber Cost Summary', 15, materialsEndY + 2);
+
+    autoTable(doc, {
+      startY: materialsEndY + 6,
+      head: [['Section', 'Lumber Selected', 'QTY (+20%)', 'Material Cost']],
+      body: lumberRows,
+      foot: [['', '', 'Total Lumber Cost', formatCurrency(lumber.totalCost)]],
+      theme: 'grid',
+      headStyles: {
+        fillColor: [120, 60, 10] as [number, number, number],
+        textColor: [255, 220, 100] as [number, number, number],
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      bodyStyles: { textColor: darkColor, fontSize: 10 },
+      footStyles: {
+        fillColor: [250, 240, 210] as [number, number, number],
+        textColor: [100, 50, 0] as [number, number, number],
+        fontStyle: 'bold',
+        fontSize: 11
+      },
+      columnStyles: {
+        0: { cellWidth: 45 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 32, halign: 'right', fontStyle: 'bold' },
+      },
+      alternateRowStyles: { fillColor: [255, 248, 230] },
+      margin: { left: 15, right: 15 }
+    });
+
+    lumberEndY = (doc as any).lastAutoTable.finalY + 8;
+  }
+
   // === ITEMIZED BREAKDOWN TABLE ===
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...darkColor);
-  doc.text('💰  Cost Breakdown', 15, materialsEndY + 2);
+  doc.text('💰  Cost Breakdown', 15, lumberEndY + 2);
 
   const tableData = breakdown.lineItems.map(item => [
     item.name,
@@ -144,7 +211,7 @@ export function generateEstimatePDF(state: EstimateState, breakdown: PricingBrea
   ]);
 
   autoTable(doc, {
-    startY: materialsEndY + 6,
+    startY: lumberEndY + 6,
     head: [['Description', 'Quantity', 'Unit Price', 'Total']],
     body: tableData,
     theme: 'grid',

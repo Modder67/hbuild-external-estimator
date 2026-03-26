@@ -47,6 +47,7 @@ export interface EstimateState {
   };
   measurements: Record<MeasurementType, number[]>;
   joistSize: JoistSize;
+  lumberSelections: { ledger: string; framing: string; joist: string };
   stairPosts: StairPosts;
   materialTier: MaterialTier;
   addons: AddonState[];
@@ -118,7 +119,10 @@ export interface PricingBreakdown {
   totalLedgerLf: number;
   totalRailingLf: number;
   lumberCounts: LumberCounts;
+  lumber: import('./lumber').LumberBreakdown;
 }
+
+import { calculateLumberBreakdown } from './lumber';
 
 export function sumArray(arr: number[]): number {
   return arr.reduce((sum, val) => sum + (Number(val) || 0), 0);
@@ -223,6 +227,12 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     deck075x55x20:  totalDeckBoards,
   };
 
+  const lumber = calculateLumberBreakdown(
+    state.lumberSelections ?? { ledger: '', framing: '', joist: '' },
+    totalLedgerLf,
+    totalLf,
+  );
+
   return {
     lineItems,
     subtotal,
@@ -234,6 +244,7 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
     totalLedgerLf,
     totalRailingLf,
     lumberCounts,
+    lumber,
   };
 }
 

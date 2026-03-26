@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useEstimateForm } from '@/hooks/useEstimateForm';
 import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, JOIST_SIZES, JoistSize, sumArray } from '@/lib/pricing';
+import { LUMBER_OPTIONS, LUMBER_GROUPS, LUMBER_BY_ID, calcJoistCount, type LumberCalcResult } from '@/lib/lumber';
 import { generateEstimatePDF } from '@/lib/pdfExport';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +27,7 @@ export default function EstimateBuilder() {
     removeMeasurementSegment,
     updateStairPosts,
     updateJoistSize,
+    updateLumberSelection,
     setMaterialTier, 
     updateAddon, 
     setMarkup, 
@@ -162,6 +164,15 @@ export default function EstimateBuilder() {
                 addMeasurementSegment={addMeasurementSegment}
                 removeMeasurementSegment={removeMeasurementSegment}
               />
+
+              {/* Ledger Board lumber selector */}
+              <LumberSelector
+                label="Ledger Board"
+                section="ledger"
+                selectedId={state.lumberSelections?.ledger ?? ''}
+                lumberCalc={pricing.lumber.ledger}
+                onSelect={updateLumberSelection}
+              />
               
               <MeasurementGroup 
                 title="Framing / Perimeter" 
@@ -172,6 +183,15 @@ export default function EstimateBuilder() {
                 updateMeasurement={updateMeasurement} 
                 addMeasurementSegment={addMeasurementSegment}
                 removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              {/* Framing lumber selector */}
+              <LumberSelector
+                label="New Ledger"
+                section="framing"
+                selectedId={state.lumberSelections?.framing ?? ''}
+                lumberCalc={pricing.lumber.framing}
+                onSelect={updateLumberSelection}
               />
 
               <MeasurementGroup 
@@ -196,16 +216,50 @@ export default function EstimateBuilder() {
                 removeMeasurementSegment={removeMeasurementSegment}
               />
 
-              {/* Floor Joists */}
-              <MeasurementGroup 
-                title="Floor Joists" 
-                icon={<Ruler className="w-4 h-4" />}
-                type="joistCount" 
-                state={state} 
-                unit="Each"
-                updateMeasurement={updateMeasurement} 
-                addMeasurementSegment={addMeasurementSegment}
-                removeMeasurementSegment={removeMeasurementSegment}
+              {/* Deck board auto-count */}
+              {pricing.totalDeckSqFt > 0 && (
+                <div className="flex items-center gap-3 px-1">
+                  <Grid3X3 className="w-4 h-4 text-primary shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">{pricing.totalDeckSqFt} sq ft</span>
+                    {' → '}
+                    <span className="font-bold text-primary text-base">{pricing.totalDeckBoards} deck boards</span>
+                    <span className="text-xs ml-1">(@ ×0.1410)</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Floor Joists — auto-calculated */}
+              <div className="bg-card/50 rounded-xl border border-border/50 p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Ruler className="w-4 h-4 text-primary" />
+                  <h4 className="font-semibold text-foreground">Floor Joists</h4>
+                </div>
+                {pricing.totalLedgerLf > 0 || pricing.totalLf > 0 ? (
+                  <div className="flex items-center gap-3 bg-background/40 rounded-lg px-4 py-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Auto-Calculated Joist Count</p>
+                      <p className="text-2xl font-bold font-mono text-primary">
+                        {calcJoistCount(pricing.totalLedgerLf, pricing.totalLf)}
+                        <span className="text-sm font-normal text-muted-foreground ml-2">joists</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        ({pricing.totalLedgerLf} + {pricing.totalLf}) LF ÷ 16" OC × 1.20 overage
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Enter Ledger Board and Framing/Perimeter measurements to auto-calculate.</p>
+                )}
+              </div>
+
+              {/* Floor Joist lumber selector */}
+              <LumberSelector
+                label="Floor Joists"
+                section="joist"
+                selectedId={state.lumberSelections?.joist ?? ''}
+                lumberCalc={pricing.lumber.joist}
+                onSelect={updateLumberSelection}
               />
 
               {/* Optional Existing Joist Size */}
@@ -356,6 +410,58 @@ export default function EstimateBuilder() {
                 </div>
               )}
             </div>
+
+            {/* Contractor-Only Lumber Cost Summary */}
+            {(pricing.lumber.ledger || pricing.lumber.framing || pricing.lumber.joist) && (
+              <div className="rounded-xl border-2 border-amber-700/50 bg-amber-950/30 p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                  <h4 className="font-bold text-amber-400 uppercase tracking-wider text-sm">Contractor Use Only — Lumber Cost</h4>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-amber-700/30 text-amber-500/70 uppercase text-xs tracking-wider">
+                      <th className="text-left pb-2">Section</th>
+                      <th className="text-left pb-2">Lumber</th>
+                      <th className="text-center pb-2">QTY</th>
+                      <th className="text-right pb-2">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-700/20">
+                    {pricing.lumber.ledger && pricing.lumber.ledger.qty > 0 && (
+                      <tr>
+                        <td className="py-2 text-muted-foreground">Ledger Board</td>
+                        <td className="py-2 font-mono text-foreground">{pricing.lumber.ledger.option.label}</td>
+                        <td className="py-2 text-center font-bold text-amber-400">{pricing.lumber.ledger.qty} pcs</td>
+                        <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.ledger.cost)}</td>
+                      </tr>
+                    )}
+                    {pricing.lumber.framing && pricing.lumber.framing.qty > 0 && (
+                      <tr>
+                        <td className="py-2 text-muted-foreground">New Ledger (Framing)</td>
+                        <td className="py-2 font-mono text-foreground">{pricing.lumber.framing.option.label}</td>
+                        <td className="py-2 text-center font-bold text-amber-400">{pricing.lumber.framing.qty} pcs</td>
+                        <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.framing.cost)}</td>
+                      </tr>
+                    )}
+                    {pricing.lumber.joist && pricing.lumber.joist.qty > 0 && (
+                      <tr>
+                        <td className="py-2 text-muted-foreground">Floor Joists</td>
+                        <td className="py-2 font-mono text-foreground">{pricing.lumber.joist.option.label}</td>
+                        <td className="py-2 text-center font-bold text-amber-400">{pricing.lumber.joist.qty} pcs</td>
+                        <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.joist.cost)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-amber-700/40">
+                      <td colSpan={3} className="pt-3 text-amber-400 font-semibold uppercase text-xs tracking-wider">Total Lumber Cost</td>
+                      <td className="pt-3 text-right font-bold text-amber-300 text-base font-mono">{formatCurrency(pricing.lumber.totalCost)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
 
           </CardContent>
         </Card>
@@ -736,6 +842,68 @@ function MeasurementGroup({
           <Plus className="w-4 h-4 mr-2" /> Add Segment
         </Button>
       </div>
+    </div>
+  );
+}
+
+// --- Lumber Selector Component ---
+function LumberSelector({
+  label,
+  section,
+  selectedId,
+  lumberCalc,
+  onSelect,
+}: {
+  label: string;
+  section: 'ledger' | 'framing' | 'joist';
+  selectedId: string;
+  lumberCalc: LumberCalcResult | null;
+  onSelect: (section: 'ledger' | 'framing' | 'joist', id: string) => void;
+}) {
+  return (
+    <div className="bg-card/40 rounded-xl border border-amber-800/30 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Download className="w-4 h-4 text-amber-400" />
+        <h4 className="font-semibold text-sm text-amber-300">{label} — Lumber Selection</h4>
+      </div>
+
+      <select
+        value={selectedId}
+        onChange={(e) => onSelect(section, e.target.value)}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/60"
+      >
+        <option value="">— Select Lumber —</option>
+        {LUMBER_GROUPS.map(group => (
+          <optgroup key={group.label} label={group.label}>
+            {group.ids.map(id => {
+              const opt = LUMBER_BY_ID[id];
+              return (
+                <option key={id} value={id}>
+                  {opt.label} — ${opt.costPerUnit.toFixed(2)}/{opt.unit}
+                </option>
+              );
+            })}
+          </optgroup>
+        ))}
+      </select>
+
+      {lumberCalc && lumberCalc.qty > 0 && (
+        <div className="flex items-center justify-between bg-amber-950/40 rounded-lg px-4 py-2.5 border border-amber-800/30">
+          <div>
+            <p className="text-xs text-amber-500/80 uppercase tracking-wider">Qty Needed (+20% overage)</p>
+            <p className="text-xl font-bold font-mono text-amber-300">
+              {lumberCalc.qty}
+              <span className="text-sm font-normal text-amber-500/70 ml-1">{lumberCalc.option.unit === 'LFT' ? 'LFT' : 'pcs'}</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-amber-500/80 uppercase tracking-wider">Material Cost</p>
+            <p className="text-xl font-bold font-mono text-amber-300">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(lumberCalc.cost)}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

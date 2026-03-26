@@ -28,6 +28,7 @@ const defaultState: EstimateState = {
     stair10: [0],
   },
   joistSize: '',
+  lumberSelections: { ledger: '', framing: '', joist: '' },
   stairPosts: { left: 0, middle: 0, right: 0, center: 0 },
   materialTier: 'premium',
   addons: DEFAULT_ADDONS,
@@ -108,6 +109,13 @@ export function useEstimateForm() {
     setState(prev => ({ ...prev, joistSize: size }));
   };
 
+  const updateLumberSelection = (section: 'ledger' | 'framing' | 'joist', id: string) => {
+    setState(prev => ({
+      ...prev,
+      lumberSelections: { ...prev.lumberSelections, [section]: id }
+    }));
+  };
+
   const setMaterialTier = (tier: EstimateState['materialTier']) => {
     setState(prev => ({ ...prev, materialTier: tier }));
   };
@@ -145,6 +153,7 @@ export function useEstimateForm() {
     removeMeasurementSegment,
     updateStairPosts,
     updateJoistSize,
+    updateLumberSelection,
     setMaterialTier,
     updateAddon,
     setMarkup,
