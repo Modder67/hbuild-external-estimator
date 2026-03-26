@@ -9,6 +9,7 @@ import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, JOIST_
 import { LUMBER_OPTIONS, LUMBER_GROUPS, LUMBER_BY_ID, BEAM_LUMBER_GROUPS, POST_LUMBER_GROUPS, calcJoistCount, type LumberCalcResult } from '@/lib/lumber';
 import { generateEstimatePDF } from '@/lib/pdfExport';
 import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
+import { generateExcelExport } from '@/lib/excelExport';
 import { useToast } from '@/hooks/use-toast';
 
 // --- UI Components ---
@@ -819,6 +820,22 @@ export default function EstimateBuilder() {
             >
               <Download className="w-4 h-4 mr-2" />
               Lumber Takeoff
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                try {
+                  generateExcelExport(state, pricing);
+                  toast({ title: 'Excel Exported', description: 'Your estimate spreadsheet is downloading.' });
+                } catch {
+                  toast({ title: 'Error', description: 'Failed to generate Excel file.', variant: 'destructive' });
+                }
+              }}
+              className="flex-1 sm:flex-none border-green-700/60 text-green-400 hover:bg-green-950/40 hover:border-green-500 font-semibold h-14 px-5 rounded-xl transition-all"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Excel
             </Button>
             <Button 
               size="lg" 
