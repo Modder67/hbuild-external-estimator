@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import { useEstimateForm } from '@/hooks/useEstimateForm';
 import { calculatePricing, formatCurrency, MeasurementType, RAILING_RATE, JOIST_SIZES, JoistSize, sumArray } from '@/lib/pricing';
-import { LUMBER_OPTIONS, LUMBER_GROUPS, LUMBER_BY_ID, calcJoistCount, type LumberCalcResult } from '@/lib/lumber';
+import { LUMBER_OPTIONS, LUMBER_GROUPS, LUMBER_BY_ID, BEAM_LUMBER_GROUPS, POST_LUMBER_GROUPS, calcJoistCount, type LumberCalcResult } from '@/lib/lumber';
 import { generateEstimatePDF } from '@/lib/pdfExport';
+import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { useToast } from '@/hooks/use-toast';
 
 // --- UI Components ---
@@ -320,6 +321,17 @@ export default function EstimateBuilder() {
                 removeMeasurementSegment={removeMeasurementSegment}
               />
 
+              {/* Beam lumber selector */}
+              <LumberSelector
+                label="Beam Lumber"
+                section="beam"
+                selectedId={state.lumberSelections?.beam ?? ''}
+                lumberCalc={pricing.lumber.beam}
+                qtyLabel={pricing.lumber.beam ? `${pricing.lumber.beam.qty} ${pricing.lumber.beam.option.unit === 'LFT' ? 'LFT' : 'pcs'} (+20% overage)` : undefined}
+                groups={BEAM_LUMBER_GROUPS}
+                onSelect={updateLumberSelection}
+              />
+
               <MeasurementGroup 
                 title="Post Count" 
                 icon={<Ruler className="w-4 h-4" />}
@@ -329,6 +341,17 @@ export default function EstimateBuilder() {
                 updateMeasurement={updateMeasurement} 
                 addMeasurementSegment={addMeasurementSegment}
                 removeMeasurementSegment={removeMeasurementSegment}
+              />
+
+              {/* Post lumber selector */}
+              <LumberSelector
+                label="Post Lumber"
+                section="post"
+                selectedId={state.lumberSelections?.post ?? ''}
+                lumberCalc={pricing.lumber.post}
+                qtyLabel={pricing.lumber.post ? `${pricing.lumber.post.qty} posts (qty as entered)` : undefined}
+                groups={POST_LUMBER_GROUPS}
+                onSelect={updateLumberSelection}
               />
 
               <MeasurementGroup 
@@ -422,7 +445,7 @@ export default function EstimateBuilder() {
             </div>
 
             {/* Contractor-Only Lumber Cost Summary */}
-            {(pricing.lumber.ledger || pricing.lumber.framing || pricing.lumber.joist) && (
+            {(pricing.lumber.ledger || pricing.lumber.framing || pricing.lumber.joist || pricing.lumber.beam || pricing.lumber.post) && (
               <div className="rounded-xl border-2 border-amber-700/50 bg-amber-950/30 p-5 space-y-4">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
@@ -460,6 +483,24 @@ export default function EstimateBuilder() {
                         <td className="py-2 font-mono text-foreground">{pricing.lumber.joist.option.label}</td>
                         <td className="py-2 text-center font-bold text-amber-400">{pricing.lumber.joist.qty} pcs</td>
                         <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.joist.cost)}</td>
+                      </tr>
+                    )}
+                    {pricing.lumber.beam && pricing.lumber.beam.qty > 0 && (
+                      <tr>
+                        <td className="py-2 text-muted-foreground">Beam Replacement</td>
+                        <td className="py-2 font-mono text-foreground">{pricing.lumber.beam.option.label}</td>
+                        <td className="py-2 text-center font-bold text-amber-400">
+                          {pricing.lumber.beam.qty} {pricing.lumber.beam.option.unit === 'LFT' ? 'LFT' : 'pcs'}
+                        </td>
+                        <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.beam.cost)}</td>
+                      </tr>
+                    )}
+                    {pricing.lumber.post && pricing.lumber.post.qty > 0 && (
+                      <tr>
+                        <td className="py-2 text-muted-foreground">Posts</td>
+                        <td className="py-2 font-mono text-foreground">{pricing.lumber.post.option.label}</td>
+                        <td className="py-2 text-center font-bold text-amber-400">{pricing.lumber.post.qty} EA</td>
+                        <td className="py-2 text-right font-mono text-foreground">{formatCurrency(pricing.lumber.post.cost)}</td>
                       </tr>
                     )}
                   </tbody>
@@ -750,21 +791,44 @@ export default function EstimateBuilder() {
 
       {/* Floating Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="hidden sm:block">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <div className="hidden sm:block shrink-0">
             <p className="text-sm text-muted-foreground">Selected Total:</p>
             <p className="text-xl font-display font-bold text-primary">
               {formatCurrency(pricing.totals[state.selectedMarkup])}
             </p>
           </div>
-          <Button 
-            size="lg" 
-            onClick={handleGeneratePDF}
-            className="w-full sm:w-auto bg-primary text-black hover:bg-primary/90 font-bold text-lg px-8 h-14 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all hover:-translate-y-1"
-          >
-            <Download className="w-5 h-5 mr-2" />
-            Generate PDF
-          </Button>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={async () => {
+                const hasLumber = Object.values(pricing.lumber).some(v => v && typeof v === 'object' && (v as any).qty > 0);
+                if (!hasLumber) {
+                  toast({ title: 'No Lumber Selected', description: 'Select at least one lumber option to generate a takeoff.', variant: 'destructive' });
+                  return;
+                }
+                try {
+                  await generateLumberTakeoffPDF(state, pricing);
+                  toast({ title: 'Lumber Takeoff Generated', description: 'Takeoff PDF ready for ordering.' });
+                } catch {
+                  toast({ title: 'Error', description: 'Failed to generate takeoff PDF.', variant: 'destructive' });
+                }
+              }}
+              className="flex-1 sm:flex-none border-amber-600/50 text-amber-400 hover:bg-amber-950/40 hover:border-amber-500 font-semibold h-14 px-5 rounded-xl transition-all"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Lumber Takeoff
+            </Button>
+            <Button 
+              size="lg" 
+              onClick={handleGeneratePDF}
+              className="flex-1 sm:flex-none bg-primary text-black hover:bg-primary/90 font-bold text-lg px-8 h-14 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all hover:-translate-y-1"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Generate PDF
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -862,14 +926,19 @@ function LumberSelector({
   section,
   selectedId,
   lumberCalc,
+  qtyLabel,
+  groups,
   onSelect,
 }: {
   label: string;
-  section: 'ledger' | 'framing' | 'joist';
+  section: 'ledger' | 'framing' | 'joist' | 'beam' | 'post';
   selectedId: string;
   lumberCalc: LumberCalcResult | null;
-  onSelect: (section: 'ledger' | 'framing' | 'joist', id: string) => void;
+  qtyLabel?: string;
+  groups?: { label: string; ids: string[] }[];
+  onSelect: (section: 'ledger' | 'framing' | 'joist' | 'beam' | 'post', id: string) => void;
 }) {
+  const displayGroups = groups ?? LUMBER_GROUPS;
   return (
     <div className="bg-card/40 rounded-xl border border-amber-800/30 p-4 space-y-3">
       <div className="flex items-center gap-2">
@@ -883,7 +952,7 @@ function LumberSelector({
         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/60"
       >
         <option value="">— Select Lumber —</option>
-        {LUMBER_GROUPS.map(group => (
+        {displayGroups.map(group => (
           <optgroup key={group.label} label={group.label}>
             {group.ids.map(id => {
               const opt = LUMBER_BY_ID[id];
@@ -900,10 +969,9 @@ function LumberSelector({
       {lumberCalc && lumberCalc.qty > 0 && (
         <div className="flex items-center justify-between bg-amber-950/40 rounded-lg px-4 py-2.5 border border-amber-800/30">
           <div>
-            <p className="text-xs text-amber-500/80 uppercase tracking-wider">Qty Needed (+20% overage)</p>
+            <p className="text-xs text-amber-500/80 uppercase tracking-wider">Qty Needed</p>
             <p className="text-xl font-bold font-mono text-amber-300">
-              {lumberCalc.qty}
-              <span className="text-sm font-normal text-amber-500/70 ml-1">{lumberCalc.option.unit === 'LFT' ? 'LFT' : 'pcs'}</span>
+              {qtyLabel ?? `${lumberCalc.qty} ${lumberCalc.option.unit === 'LFT' ? 'LFT' : 'pcs'}`}
             </p>
           </div>
           <div className="text-right">

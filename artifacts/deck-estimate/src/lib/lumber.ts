@@ -29,21 +29,30 @@ export const LUMBER_OPTIONS: LumberOption[] = [
   { id: 'microlam',    label: '11 7/8" Microlam',     size: '11 7/8"',  species: 'Microlam',    unit: 'LFT', lengthFt: 0,  costPerUnit: 8.50  },
   { id: 'glulam',      label: '5½" × 9½" Glulam',    size: '5½"×9½"',  species: 'Glulam',      unit: 'LFT', lengthFt: 0,  costPerUnit: 32.00 },
   // Posts
-  { id: '4x4',         label: '4×4',                  size: '4×4',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 24.00  },
-  { id: '6x6',         label: '6×6',                  size: '6×6',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 126.00 },
-  { id: '8x8',         label: '8×8',                  size: '8×8',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 224.00 },
+  { id: '4x4',         label: '4×4 Post',             size: '4×4',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 24.00  },
+  { id: '6x6',         label: '6×6 Post',             size: '6×6',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 126.00 },
+  { id: '8x8',         label: '8×8 Post',             size: '8×8',      species: 'Post',        unit: 'EA',  lengthFt: 0,  costPerUnit: 224.00 },
 ];
 
 export const LUMBER_BY_ID: Record<string, LumberOption> = Object.fromEntries(
   LUMBER_OPTIONS.map(o => [o.id, o])
 );
 
-// Groups for display in dropdown
 export const LUMBER_GROUPS: { label: string; ids: string[] }[] = [
   { label: '2×10 True Frame', ids: ['2x10x8-tf', '2x10x10-tf', '2x10x12-tf', '2x10x16-tf', '2x10x20-tf'] },
   { label: '2×12 True Frame', ids: ['2x12x12-tf', '2x12x16-tf', '2x12x20-tf'] },
   { label: '2×12 #2 Doug Fir', ids: ['2x12x8-df', '2x12x10-df', '2x12x12-df', '2x12x16-df', '2x12x20-df'] },
   { label: 'Engineered Lumber', ids: ['microlam', 'glulam'] },
+  { label: 'Posts', ids: ['4x4', '6x6', '8x8'] },
+];
+
+export const BEAM_LUMBER_GROUPS: { label: string; ids: string[] }[] = [
+  { label: '2×12 True Frame', ids: ['2x12x12-tf', '2x12x16-tf', '2x12x20-tf'] },
+  { label: '2×12 #2 Doug Fir', ids: ['2x12x8-df', '2x12x10-df', '2x12x12-df', '2x12x16-df', '2x12x20-df'] },
+  { label: 'Engineered Lumber', ids: ['microlam', 'glulam'] },
+];
+
+export const POST_LUMBER_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Posts', ids: ['4x4', '6x6', '8x8'] },
 ];
 
@@ -56,8 +65,6 @@ export interface LumberCalcResult {
 /**
  * Ledger Board lumber
  * Covers total ledger LF with 20% overage.
- * If board has a fixed length: qty = ceil(LF * 1.20 / boardLength)
- * If LFT-based: qty (in LFT) = ceil(LF * 1.20)
  */
 export function calcLedgerLumber(option: LumberOption, totalLedgerLf: number): LumberCalcResult {
   if (totalLedgerLf <= 0) return { option, qty: 0, cost: 0 };
@@ -83,7 +90,6 @@ export function calcFramingLumber(option: LumberOption, totalFramingLf: number):
 /**
  * Floor Joist lumber
  * Joist count = (ledger LF + framing LF) / (16" OC = 1.333 ft) × 1.20 overage
- * Each joist = 1 board of selected lumber.
  */
 export function calcJoistLumber(option: LumberOption, totalLedgerLf: number, totalFramingLf: number): LumberCalcResult {
   const total = totalLedgerLf + totalFramingLf;
@@ -98,30 +104,63 @@ export function calcJoistCount(totalLedgerLf: number, totalFramingLf: number): n
   return Math.ceil((total / (16 / 12)) * 1.20);
 }
 
+/**
+ * Beam Replacement lumber
+ * Covers total beam LF with 20% overage.
+ * EA boards: ceil(totalBeamLf × 1.20 / boardLength)
+ * LFT products: ceil(totalBeamLf × 1.20) LFT
+ */
+export function calcBeamLumber(option: LumberOption, totalBeamLf: number): LumberCalcResult {
+  if (totalBeamLf <= 0) return { option, qty: 0, cost: 0 };
+  const qty = option.lengthFt > 0
+    ? Math.ceil((totalBeamLf * 1.20) / option.lengthFt)
+    : Math.ceil(totalBeamLf * 1.20);
+  return { option, qty, cost: qty * option.costPerUnit };
+}
+
+/**
+ * Post lumber
+ * One unit per post — qty = totalPostCount exactly (no overage; posts are cut-to-order).
+ */
+export function calcPostLumber(option: LumberOption, totalPostCount: number): LumberCalcResult {
+  if (totalPostCount <= 0) return { option, qty: 0, cost: 0 };
+  return { option, qty: totalPostCount, cost: totalPostCount * option.costPerUnit };
+}
+
 export interface LumberBreakdown {
   ledger: LumberCalcResult | null;
   framing: LumberCalcResult | null;
   joist: LumberCalcResult | null;
+  beam: LumberCalcResult | null;
+  post: LumberCalcResult | null;
   totalCost: number;
 }
 
 export function calculateLumberBreakdown(
-  lumberSelections: { ledger: string; framing: string; joist: string },
+  lumberSelections: { ledger: string; framing: string; joist: string; beam: string; post: string },
   totalLedgerLf: number,
   totalFramingLf: number,
+  totalBeamLf: number,
+  totalPostCount: number,
 ): LumberBreakdown {
   const ledgerOpt = LUMBER_BY_ID[lumberSelections.ledger] ?? null;
   const framingOpt = LUMBER_BY_ID[lumberSelections.framing] ?? null;
   const joistOpt = LUMBER_BY_ID[lumberSelections.joist] ?? null;
+  const beamOpt = LUMBER_BY_ID[lumberSelections.beam] ?? null;
+  const postOpt = LUMBER_BY_ID[lumberSelections.post] ?? null;
 
   const ledger = ledgerOpt ? calcLedgerLumber(ledgerOpt, totalLedgerLf) : null;
   const framing = framingOpt ? calcFramingLumber(framingOpt, totalFramingLf) : null;
   const joist = joistOpt ? calcJoistLumber(joistOpt, totalLedgerLf, totalFramingLf) : null;
+  const beam = beamOpt ? calcBeamLumber(beamOpt, totalBeamLf) : null;
+  const post = postOpt ? calcPostLumber(postOpt, totalPostCount) : null;
 
   const totalCost =
     (ledger?.cost ?? 0) +
     (framing?.cost ?? 0) +
-    (joist?.cost ?? 0);
+    (joist?.cost ?? 0) +
+    (beam?.cost ?? 0) +
+    (post?.cost ?? 0);
 
-  return { ledger, framing, joist, totalCost };
+  return { ledger, framing, joist, beam, post, totalCost };
 }

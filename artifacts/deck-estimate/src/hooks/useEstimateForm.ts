@@ -28,7 +28,7 @@ const defaultState: EstimateState = {
     stair10: [0],
   },
   joistSize: '',
-  lumberSelections: { ledger: '', framing: '', joist: '' },
+  lumberSelections: { ledger: '', framing: '', joist: '', beam: '', post: '' },
   stairPosts: { left: 0, middle: 0, right: 0, center: 0 },
   materialTier: 'premium',
   addons: DEFAULT_ADDONS,
@@ -46,6 +46,7 @@ export function useEstimateForm() {
           ...parsed,
           measurements: { ...defaultState.measurements, ...(parsed.measurements || {}) },
           stairPosts: { ...defaultState.stairPosts, ...(parsed.stairPosts || {}) },
+          lumberSelections: { ...defaultState.lumberSelections, ...(parsed.lumberSelections || {}) },
           addons: defaultState.addons.map(defaultAddon => {
             const storedAddon = parsed.addons?.find((a: any) => a.id === defaultAddon.id);
             return storedAddon ? { ...defaultAddon, ...storedAddon } : defaultAddon;
@@ -109,7 +110,7 @@ export function useEstimateForm() {
     setState(prev => ({ ...prev, joistSize: size }));
   };
 
-  const updateLumberSelection = (section: 'ledger' | 'framing' | 'joist', id: string) => {
+  const updateLumberSelection = (section: 'ledger' | 'framing' | 'joist' | 'beam' | 'post', id: string) => {
     setState(prev => ({
       ...prev,
       lumberSelections: { ...prev.lumberSelections, [section]: id }

@@ -47,7 +47,7 @@ export interface EstimateState {
   };
   measurements: Record<MeasurementType, number[]>;
   joistSize: JoistSize;
-  lumberSelections: { ledger: string; framing: string; joist: string };
+  lumberSelections: { ledger: string; framing: string; joist: string; beam: string; post: string };
   stairPosts: StairPosts;
   materialTier: MaterialTier;
   addons: AddonState[];
@@ -228,9 +228,11 @@ export function calculatePricing(state: EstimateState): PricingBreakdown {
   };
 
   const lumber = calculateLumberBreakdown(
-    state.lumberSelections ?? { ledger: '', framing: '', joist: '' },
+    state.lumberSelections ?? { ledger: '', framing: '', joist: '', beam: '', post: '' },
     totalLedgerLf,
     totalLf,
+    totalBeamLf,
+    totalPosts,
   );
 
   return {
