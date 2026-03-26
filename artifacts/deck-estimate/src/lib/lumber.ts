@@ -89,19 +89,17 @@ export function calcFramingLumber(option: LumberOption, totalFramingLf: number):
 
 /**
  * Floor Joist lumber
- * Joist count = (ledger LF + framing LF) / (16" OC = 1.333 ft) × 1.20 overage
+ * Joist count = framing LF / (16" OC = 1.333 ft) × 1.20 overage
  */
 export function calcJoistLumber(option: LumberOption, totalLedgerLf: number, totalFramingLf: number): LumberCalcResult {
-  const total = totalLedgerLf + totalFramingLf;
-  if (total <= 0) return { option, qty: 0, cost: 0 };
-  const qty = Math.ceil((total / (16 / 12)) * 1.20);
+  if (totalFramingLf <= 0) return { option, qty: 0, cost: 0 };
+  const qty = Math.ceil((totalFramingLf / (16 / 12)) * 1.20);
   return { option, qty, cost: qty * option.costPerUnit };
 }
 
 export function calcJoistCount(totalLedgerLf: number, totalFramingLf: number): number {
-  const total = totalLedgerLf + totalFramingLf;
-  if (total <= 0) return 0;
-  return Math.ceil((total / (16 / 12)) * 1.20);
+  if (totalFramingLf <= 0) return 0;
+  return Math.ceil((totalFramingLf / (16 / 12)) * 1.20);
 }
 
 /**

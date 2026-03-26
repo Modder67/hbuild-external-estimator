@@ -246,7 +246,7 @@ export default function EstimateBuilder() {
                   <Ruler className="w-4 h-4 text-primary" />
                   <h4 className="font-semibold text-foreground">Floor Joists</h4>
                 </div>
-                {pricing.totalLedgerLf > 0 || pricing.totalLf > 0 ? (
+                {pricing.totalLf > 0 ? (
                   <div className="flex items-center gap-3 bg-background/40 rounded-lg px-4 py-3">
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wider">Auto-Calculated Joist Count</p>
@@ -255,12 +255,12 @@ export default function EstimateBuilder() {
                         <span className="text-sm font-normal text-muted-foreground ml-2">joists</span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        ({pricing.totalLedgerLf} + {pricing.totalLf}) LF ÷ 16" OC × 1.20 overage
+                        {pricing.totalLf} LF (framing) ÷ 16" OC × 1.20 overage
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic">Enter Ledger Board and Framing/Perimeter measurements to auto-calculate.</p>
+                  <p className="text-xs text-muted-foreground italic">Enter Framing/Perimeter measurements to auto-calculate.</p>
                 )}
               </div>
 
