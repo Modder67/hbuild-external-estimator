@@ -1,0 +1,1374 @@
+---
+name: hbuild-app-ecosystem
+description: "Governing spec for any HBUILD app: mobile-first UX, bronze-and-gold tokens, shared Supabase identity, subdomain mesh, release gate, and the living registry of apps, exports and decisions."
+---
+
+# HBUILD Application Ecosystem
+
+Specification version: 3.3.0
+
+## Purpose
+
+Every HBUILD application must look related, behave consistently, and operate
+as an independently deployable module of one platform.
+
+Primary device: iPhone.
+Secondary devices: iPad and desktop.
+
+This file is the canonical working specification. Keep app registrations,
+exports, imports, grants, decisions, and unresolved questions in Scratch below
+until the owner explicitly approves splitting the specification.
+
+This skill specifies required behavior. It does not certify an implementation
+as secure, compliant, tested, or production-ready.
+
+---
+
+## 1. When and How to Use This Skill
+
+Use this skill when creating, changing, reviewing, or integrating any HBUILD app.
+
+Before implementation:
+
+1. Read this entire file for first architectural onboarding or a platform-wide
+   design change. For subsequent bounded maintenance, read this section and
+   the task-relevant sections and Scratch rows using `MAINTENANCE.md` at the
+   workspace root. Cross-app/security changes require sections 14-20 and the
+   affected contracts. Expand the read when dependencies or conflicts require
+   it; selective reading does not waive any governing requirement.
+2. Inspect the repository instructions and current implementation.
+3. Inspect the affected manifest, shared packages, authentication, migrations,
+   and tests as relevant to the change; do not re-audit unrelated applications.
+4. Identify affected apps and data owners.
+5. Identify existing reusable components and contracts.
+6. Explain material gaps and the proposed changes briefly.
+7. Preserve unrelated work.
+8. Implement only within the user's authorized scope.
+
+Do not deploy, change production grants, run production migrations, send
+messages, or create paid infrastructure merely because this skill describes
+those operations. Obtain authorization appropriate to the requested work.
+
+For review-only requests, inspect and report without implementing.
+
+### Priority order
+
+Resolve conflicts in this order:
+
+1. Security and tenant isolation
+2. Data integrity
+3. Accessibility
+4. Shared platform contracts
+5. Mobile usability
+6. HBUILD visual consistency
+7. App-specific preferences
+
+Explain exceptions and record them in Scratch.
+
+Do not invent domains, credentials, organization IDs, existing applications,
+signed agreements, completed tests, or vendor entitlements. Use `TBD`.
+
+---
+
+# PART I — SHARED PRODUCT EXPERIENCE
+
+## 2. Mobile-First Principles
+
+Build the compact iPhone experience first, then progressively enhance it.
+
+Every screen must:
+
+- Make the primary action obvious.
+- Work comfortably with touch and one-handed use.
+- Respond immediately to interaction.
+- Preserve work through recoverable interruptions.
+- Support keyboard and assistive technology.
+- Remain understandable without motion, haptics, color, or gestures.
+- Avoid unnecessary choices, dense toolbars, and oversized dashboards.
+
+Do not shrink a desktop dashboard into a phone screen.
+
+For calendar and planning apps, prioritize:
+
+1. What is happening now?
+2. What happens next?
+3. What needs attention?
+4. How do I create, complete, or reschedule something?
+
+Use progressive disclosure for secondary details.
+
+## 3. Responsive Layout Contract
+
+These are initial layout thresholds, not device detection rules.
+Adapt to available space, text size, and input capability.
+
+| Width | Layout |
+|---|---|
+| Below 600px | Single column, compact header, bottom navigation, sheets |
+| 600–1023px | Adaptive rail, optional second panel if content fits |
+| 1024px and above | Sidebar, workspace, optional inspector |
+
+Support small screens down to 320 CSS pixels for content reflow.
+Use Agenda instead of an unreadably compressed time grid when needed.
+
+Rules:
+
+- No essential hover-only functionality.
+- No forced portrait orientation.
+- No desktop phone-frame presentation by default.
+- Use content maximum widths where appropriate.
+- Avoid page-level horizontal scrolling.
+- Confine necessary time-grid scrolling to a clearly defined region.
+- Preserve destination names and action meanings across layouts.
+- Support iPad Split View and touch plus keyboard/trackpad.
+
+### Navigation
+
+Use a shared shell across apps:
+
+- Consistent account and organization controls
+- Consistent app switcher
+- Consistent header and navigation placement
+- Consistent loading, error, offline, and permission states
+
+App-local destinations may differ by function; do not force calendar tabs into
+an invoices app. Navigation anatomy, interaction, and terminology must remain
+consistent.
+
+Use at most five labeled bottom destinations.
+
+Suggested calendar destinations:
+
+- Today
+- Calendar
+- Plan
+- Tasks
+- More
+
+Keep app switching distinct from app-local navigation.
+
+Preserve selected date, filters, and scroll position when returning to a screen.
+
+## 4. Safe Areas, Viewport, and Keyboard
+
+Use a viewport declaration that permits zoom:
+
+```html
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover"
+/>
+<meta name="theme-color" content="#111111" />
+```
+
+Baseline:
+
+```css
+html {
+  background: #111111;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.bottom-navigation {
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+}
+```
+
+Requirements:
+
+- Keep content clear of notches and the home indicator.
+- Reserve space for fixed headers, bottom bars, and floating actions.
+- Avoid double-applying safe-area padding.
+- Handle Safari browser chrome expanding and collapsing.
+- Test keyboard opening, closing, orientation change, and standalone mode.
+- Keep focused inputs and Save controls visible.
+- Use Visual Viewport handling only where testing demonstrates a need.
+- Do not assume `100dvh` alone solves every keyboard layout.
+- Do not globally disable scrolling, text selection, or pinch zoom.
+- Restrict overscroll behavior only where it solves a tested problem.
+
+## 5. Touch, Forms, and Focus
+
+- Minimum interactive target: 44×44 CSS pixels.
+- Preferred primary control height: 48–56px.
+- Default mobile page padding: 16px.
+- Separate neighboring actions sufficiently to prevent accidental activation.
+- Put common actions within comfortable thumb reach.
+- Provide visible labels; placeholders are not labels.
+- Use suitable input types, input modes, and autocomplete.
+- Use at least 16px computed text for compact-layout editable controls.
+- Do not disable zoom to prevent iPhone input zoom.
+- Never unexpectedly autofocus and open the keyboard.
+- Preserve input after validation or network errors.
+- Avoid rigid heights that clip enlarged text.
+- Keep destructive actions away from frequent actions.
+
+Use shared, tested date and time fields. Native controls are acceptable;
+custom controls must provide equivalent accessibility and mobile usability.
+
+---
+
+# PART II — HBUILD VISUAL SYSTEM
+
+## 6. Exact Brand Tokens
+
+Use these values through semantic tokens. No arbitrary screen-level colors.
+
+```css
+:root {
+  color-scheme: dark;
+
+  --font-family-app: "Poppins", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+
+  --color-gold: #e9cc79;
+  --color-bronze: #b2802d;
+  --gradient-brand: linear-gradient(135deg, #b2802d, #e9cc79);
+
+  --color-canvas: #111111;
+  --color-card: #1a1a1a;
+  --color-muted: #222222;
+  --color-border: #2a2a2a;
+
+  --color-text-primary: #ffffff;
+  --color-text-body: #c8c8c8;
+  --color-text-secondary: #a3a3a3;
+  --color-disabled: #646464;
+  --color-on-brand: #111111;
+
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-info: #0ea5e9;
+
+  --color-focus-ring: #e9cc79;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-default: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-sheet: 1.5rem;
+  --radius-full: 999px;
+
+  --shadow-elevated: 0 6px 20px rgba(233, 204, 121, 0.18);
+
+  --touch-target-min: 44px;
+  --control-height: 48px;
+
+  --duration-press: 100ms;
+  --duration-fast: 180ms;
+  --duration-standard: 240ms;
+  --duration-sheet: 300ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+}
+```
+
+### Color rules
+
+- Canvas: application background.
+- Card: panels, sidebar, dialogs, and sheets.
+- Muted: hover surfaces and inactive chips.
+- Border: decorative hairlines and input fill.
+- Gold: focus, meaningful emphasis, current-time indicator.
+- Bronze: secondary accents and links where contrast passes.
+- Gradient: every brand primary, active, or selected fill.
+- Status colors: semantic status, never arbitrary decoration.
+
+Text and icons on gold or the gradient must be `#111111`, never white.
+
+The disabled color is for genuinely disabled or decorative content, never
+required instructions, essential metadata, or body copy.
+
+Do not assume decorative border or brand-link tokens meet every contrast
+requirement. Check their actual context. Use gold for a text link if bronze
+does not pass. Underline links where needed.
+
+Do not use color as the sole status or selection cue.
+
+Avoid gradient backgrounds on entire pages or all calendar events.
+Semantic danger/success/warning/info states retain their meaning instead of
+being recolored gold.
+
+### Radius and elevation
+
+Default radius: `0.75rem`.
+
+Use larger radii for sheets and major dialogs; pill radius for pills.
+Structural grid joins and dividers may remain square where necessary.
+
+Use gold-tinted shadows only for elevated elements, including dragged events,
+floating actions, sheets, and popovers.
+
+Do not make every card glow. Use spacing and borders for normal separation.
+Do not use black shadows as the primary elevation signal.
+
+## 7. Typography
+
+Poppins, weights 300–800.
+
+Prefer self-hosted, licensed WOFF2 assets for predictable performance and
+reduced third-party requests. If using Google Fonts, use `display=swap` and
+include its domains in the privacy and CSP review.
+
+| Role | Baseline |
+|---|---|
+| KPI figures | 30px / 700 |
+| Page titles | 20px / 700 |
+| Panel headings | 17px / 600 |
+| Large sheet items | 15px / 500 |
+| Primary buttons | 15px / 700 |
+| Body | 14px / 400 |
+| Navigation and section labels | 13.5px / 500 |
+| Interactive emphasized labels | Same role size / 600 |
+| Desktop form controls | 13px / 400 |
+| Compact editable controls | At least 16px / 400 |
+| Chips and captions | 12px / 600 |
+| Nonessential table metadata | 11px / 600 |
+| Short icon-supported tab labels | 10px / 600 |
+
+Hierarchy comes primarily from weight, spacing, and contrast rather than
+large size jumps.
+
+- Prose: 300–400.
+- Interactive emphasis: 600.
+- Buttons and major headings: 700.
+- Uppercase micro-label tracking: `.04em`.
+- Body line-height: approximately 1.5.
+- Control and heading line-height: sufficient to avoid clipping.
+
+Increase small labels when they convey essential information.
+Do not force 10px text for important mobile navigation.
+Express the type scale in rem where practical and support text enlargement.
+
+## 8. Shared Components
+
+Use versioned shared components for:
+
+- AppShell, MobileHeader, BottomNavigation, NavigationRail, AppSwitcher
+- AccountMenu, OrganizationSwitcher
+- Buttons, IconButton, FloatingActionButton
+- TextField, SearchField, DateField, TimeField, SelectField
+- Checkbox, Toggle, SegmentedControl, Tabs
+- Card, ListRow, Badge, EmptyState, Skeleton
+- Toast, UndoToast, OfflineBanner
+- BottomSheet, Dialog, ConfirmationDialog, ContextMenu
+- ErrorBoundary and permission states
+
+Do not copy a component merely to change its styling.
+Add a reusable variant or propose a new token.
+
+---
+
+# PART III — MOTION, CALENDAR, AND RELIABILITY
+
+## 9. Motion and Haptics
+
+Motion explains state and spatial relationships; it must not delay work.
+
+| Interaction | Target duration |
+|---|---|
+| Press feedback | 80–120ms |
+| Small transition | 160–220ms |
+| Sheet or panel | 220–320ms |
+| Brief success feedback | At most 500ms |
+
+Prefer transform and opacity. Avoid animating layout, large blur effects,
+excessive bounce, and decorative parallax.
+
+Provide immediate visual feedback before waiting for a server.
+
+Reduced motion must remove nonessential translation, scaling, and smooth
+scrolling. Application completion must never depend on an animation-end event.
+
+### Haptic interface
+
+```ts
+type HapticIntent =
+  | "selection"
+  | "success"
+  | "warning"
+  | "error"
+  | "impact-light"
+  | "impact-medium";
+
+function triggerHaptic(intent: HapticIntent): void;
+```
+
+Use real device haptics only when supported:
+
+- Intentional long-press activation
+- Meaningful selection or drag snap
+- Successful drop or completion
+- Important validation failure
+
+Throttle snap feedback. Never vibrate continuously while scrolling or dragging.
+
+A website or installed PWA must not promise reliable native iPhone haptics.
+Feature-detect available APIs and fail silently. Visual feedback is mandatory.
+A separately approved native wrapper may provide native haptics.
+
+Provide a feedback preference. Respect reduced motion independently from
+haptic preferences. Never depend on vibration for functionality or meaning.
+
+## 10. Sheets and Gestures
+
+Use mobile bottom sheets for quick creation, details, filters, and actions.
+
+Requirements:
+
+- Visible title and explicit close control
+- Drag handle where draggable
+- Appropriate accessible dialog semantics
+- Focus containment for modal sheets
+- Focus restoration on close
+- Inert background and scroll locking while modal
+- Keyboard-safe layout
+- Unsaved-change protection
+- Safe-area padding
+
+Use a full-height editor for complex forms.
+On wider layouts, the same content may become a dialog or side inspector.
+
+Gestures are shortcuts, never the only path.
+
+- Swiping dates requires visible previous/next controls.
+- Dragging requires an Edit/Move alternative.
+- Swipe actions reveal choices rather than silently deleting.
+- Preserve native browser edge-back gestures.
+- Distinguish vertical scrolling from horizontal date navigation.
+- Use intentional long press before dragging an event.
+- Support cancellation without committing changes.
+
+## 11. Calendar and Planner Behavior
+
+Provide Agenda, Day, Week, and Month views.
+
+Default compact experience: Agenda or Day.
+Month view is an overview with a selected-day agenda, not a dense event table.
+
+Keep Today and Create readily available.
+
+Distinguish:
+
+- Today: gold outline or marker.
+- Selected date: gradient with dark text.
+- Current time: gold line and dot.
+- Normal event: card/muted surface with readable category indicator.
+- Selected event: approved selected styling.
+
+Event information:
+
+- Title
+- Start and end time or duration
+- Status
+- Relevant location/assignee when space permits
+
+Do not make short or overlapping events impossible to tap.
+Offer an accessible list alternative.
+
+### Quick create
+
+Initially require only what the record needs:
+
+- Title
+- Date
+- Start time for scheduled items
+- End time or duration
+
+Optional details appear under More options.
+
+Use the selected date and documented user defaults.
+Flexible tasks must not require fabricated start times.
+
+### Reschedule
+
+- Intentional activation
+- Visible proposed date/time
+- Predictable snapping
+- Edge auto-scroll
+- Cancel support
+- Commit after drop
+- Save status and rollback on failure
+- Undo when safely reversible
+
+### Time correctness
+
+Use a shared date-time module.
+
+- Store timed instants with timezone-aware types.
+- Retain the scheduling IANA timezone when required.
+- Store all-day dates as dates, not midnight UTC events.
+- Represent recurrence with local time plus timezone and exceptions.
+- Test daylight-saving gaps and repeated times.
+- Require a choice for “this occurrence” versus series changes.
+- Use documented start-inclusive/end-exclusive interval semantics.
+- Enforce conflict and availability rules server-side.
+
+## 12. Shared Save, Error, and Offline Behavior
+
+Use consistent states:
+
+- Unsaved
+- Saving
+- Saved
+- Save failed
+- Offline — waiting to sync
+- Conflict requires review
+
+Optimistic updates are permitted only with a defined rollback/reconciliation
+strategy. Do not claim a server-confirmed success while a mutation is pending.
+
+Preserve drafts. Use local skeletons instead of full-app spinners.
+
+Offline support must:
+
+- Cache only approved data.
+- Namespace caches and drafts by user, organization, and app.
+- Clear or isolate caches on logout and organization switch.
+- Never cache session-refresh responses or secrets.
+- Retry when the app resumes; do not assume background sync is available.
+- Show pending state honestly.
+- Recheck authorization before replaying queued writes.
+- Use stable idempotency keys.
+- Resolve conflicts without silent overwrites.
+
+Undo is an authorized compensating operation, not merely a visual reversal.
+
+## 13. Performance and Accessibility
+
+Targets:
+
+- Immediate tap feedback, ideally within 100ms.
+- Smooth scrolling and animations on real iPhones.
+- Field p75 targets: LCP ≤2.5s, INP ≤200ms, CLS ≤0.1.
+- Establish and document bundle/data budgets before major expansion.
+
+Use route splitting, bounded date queries, pagination, adjacent-date prefetch,
+and virtualization where accessible and necessary.
+
+Aim for WCAG 2.2 AA and test:
+
+- Keyboard operation and visible focus
+- VoiceOver semantics
+- Contrast and non-color status cues
+- Zoom and text enlargement
+- Reduced motion
+- Logical reading order
+- Drag alternatives
+- Announcements for meaningful changes without excessive chatter
+
+Do not claim full conformance from automated tests alone.
+
+### PWA boundaries
+
+Each subdomain is a separate origin. Shared cookies do not automatically share
+service workers, browser storage, installed-app scope, or notification grants.
+
+Use consistent icons, theme colors, and install guidance, but do not promise
+that separate subdomains behave as one installed app. Test cross-app navigation
+in standalone iPhone mode.
+
+If one installed container is essential, record that as a separate architecture
+decision rather than silently changing the subdomain mesh.
+
+---
+
+# PART IV — UMBRELLA APPLICATION MESH
+
+## 14. Non-Negotiable Architecture
+
+- One shared Supabase project for the production umbrella.
+- One Supabase Auth identity system.
+- One shell and central gateway.
+- Shared platform entities in `core`.
+- App-owned data in `app_{normalized_slug}`.
+- Every app has `app.manifest.json`.
+- Cross-app reads and writes use the gateway.
+- No client query against another app's schema.
+- No app A migration changes app B's schema.
+- Shared SDK and environment naming conventions.
+- Organization settings are configuration, never secrets.
+
+Separate development/staging environments are allowed with authorization.
+“One project” prohibits per-app production databases; it does not require
+testing against production.
+
+Tenant-owned rows require `org_id`. Global registry rows and user profiles
+have explicitly documented scope instead of a fabricated organization ID.
+
+### Domains
+
+```text
+https://app.{PLATFORM_DOMAIN}       shell, login, /api/gateway
+https://{slug}.{PLATFORM_DOMAIN}    independently deployed app
+```
+
+Slug: kebab-case.
+Schema: `app_` plus slug with hyphens replaced by underscores.
+
+Local subdomains are optional. Do not assume `.localhost` parent cookies work
+identically everywhere. Test the chosen local hostnames or use a documented
+development-domain configuration.
+
+## 15. Shared Environment Contract
+
+```dotenv
+NEXT_PUBLIC_PLATFORM_DOMAIN=example.com
+NEXT_PUBLIC_APP_SLUG=invoices
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=PUBLIC_PROJECT_KEY
+
+# App server only:
+PLATFORM_GATEWAY_URL=https://app.example.com/api/gateway
+PLATFORM_APP_CREDENTIAL=SERVER_ONLY_APP_IDENTITY
+
+# Gateway and explicitly approved privileged workers only:
+SUPABASE_SERVICE_ROLE_KEY=SERVER_ONLY_PRIVILEGED_KEY
+```
+
+These are names and placeholders, not real credentials.
+
+- Use a validated, centralized environment module.
+- Never use raw environment access as a cross-app configuration mechanism.
+- Public keys are not authorization; privileges and RLS enforce access.
+- Do not distribute the service-role key to every app by default.
+- Use separate per-app server credentials and rotate them independently.
+- Browser code calls its own server routes.
+- Platform transport code is server-only.
+
+## 16. Shared Data Model
+
+Implement versioned migrations, not an unreviewed “run once” SQL paste.
+
+| Entity | Purpose and scope |
+|---|---|
+| `core.orgs` | Organization identity |
+| `core.profiles` | Auth-linked user display profile, not separate authentication |
+| `core.org_members` | Live membership and role |
+| `core.apps` | Global registry, canonical origin, schema, status, manifest/version |
+| `core.capabilities` | Registered actions, exact RPC mapping, request/response schemas |
+| `core.app_grants` | Org-scoped caller-to-target action permission |
+| `core.org_settings` | Typed, namespaced organization configuration |
+| `core.outbox` | Durable organization events |
+| `core.audit_log` | Restricted audit history |
+| Platform-owned idempotency records | Deduplication and stored mutation results |
+| Platform-owned delivery records | Per-subscriber attempts and acknowledgments |
+
+Add org-app enablement/entitlement records when required by the product.
+
+Enable RLS on every application-managed table. Provide explicit scoped policies
+where direct access is intended; otherwise deny browser access.
+
+Platform registry, credentials, grants, audit, and outbox writes are privileged.
+
+Membership is necessary but not sufficient for every write. Enforce action,
+role, record, and field permissions where applicable.
+
+Avoid recursive membership policies. A membership helper using elevated
+privileges must have a controlled search path, minimal ownership, and tests.
+
+Do not use JWT organization metadata as proof of current membership.
+
+## 17. Manifest Contract
+
+Example only; it does not register or grant anything:
+
+```json
+{
+  "slug": "invoices",
+  "name": "Invoices",
+  "version": "1.0.0",
+  "platformVersion": "3.0.0",
+  "origin": "https://invoices.example.com",
+  "schema": "app_invoices",
+  "exports": [
+    {
+      "action": "createInvoice",
+      "rpc": "rpc_create_invoice",
+      "description": "Create an invoice for the verified organization",
+      "mutates": true,
+      "payloadSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amountCents"],
+        "properties": {
+          "amountCents": { "type": "integer", "minimum": 0 },
+          "jobId": { "type": "string" },
+          "memo": { "type": "string", "maxLength": 500 }
+        }
+      },
+      "resultSchema": {
+        "type": "object",
+        "required": ["invoiceId"],
+        "properties": { "invoiceId": { "type": "string" } }
+      },
+      "idempotent": true,
+      "requiredRole": "admin"
+    }
+  ],
+  "imports": [
+    {
+      "app": "sight",
+      "action": "listAssignments",
+      "purpose": "Days worked per job, to bill labor",
+      "required": true
+    }
+  ],
+  "events": {
+    "publishes": ["invoices.invoice.issued", "invoices.payment.recorded"],
+    "subscribes": ["sight.assignment.changed"]
+  },
+  "capabilities": ["push-notify"],
+  "navigation": {
+    "bottom": ["Today", "Invoices", "Clients", "More"],
+    "shellEntry": "/"
+  }
+}
+```
+
+### Manifest rules
+
+- `slug` is the kebab-case app identity and never changes after first
+  registration. `schema` is derived from it and never hand-edited. The one
+  exception on record is D-14 (`count` → `ledger`, before the app held any
+  business data); read it before assuming a rename is available, and read
+  `core/0003_rename_count_to_ledger.sql` before attempting one.
+- `platformVersion` is the version of this specification the app was built or
+  last reviewed against. An app whose `platformVersion` is older than the
+  current specification is *out of date*, not broken; record the gap in Scratch.
+- Every `exports[]` entry maps to one real RPC (a Postgres function in the
+  app's own schema, or a server route the gateway can call). No export may
+  be declared without the RPC existing, and no RPC may be reachable through
+  the gateway without being declared.
+- `payloadSchema` and `resultSchema` are JSON Schema, `additionalProperties:
+  false`, and are the contract the gateway validates against. Money is always
+  integer cents; dates are `YYYY-MM-DD` strings; instants are ISO-8601 UTC;
+  identifiers are strings.
+- `mutates: true` exports must be idempotent: the caller supplies an
+  idempotency key and a repeat call returns the stored first result.
+- `imports[]` names the *action* and the *owning app*, never a table. If the
+  owning app does not export that action yet, the import is recorded in
+  Scratch as an open request to that app, and the importing app ships with a
+  clearly labelled stub or degraded mode. It does not read the other schema.
+- `events.publishes` names are `{slug}.{entity}.{pastTenseVerb}`. An app may
+  only publish events under its own slug.
+- `navigation.bottom` lists at most five destinations and is the source for
+  the shell's deep links. `shellEntry` is the path the App Switcher opens.
+- The manifest is committed at the repository root and is what the platform
+  registry (`core.apps`) stores. The registry copy wins over the repository
+  copy for what is *granted*; the repository copy wins for what is
+  *implemented*. Drift between them is a release blocker.
+
+---
+
+## 18. Gateway and Shared SDK
+
+The gateway is the only path between applications. It lives with the shell at
+`https://app.{PLATFORM_DOMAIN}/api/gateway` and is the one component that holds
+the service-role key.
+
+### Request envelope
+
+```ts
+interface PlatformCall {
+  target: string;        // slug of the app that exports the action
+  action: string;        // exported action name
+  orgId: string;         // organization the call is made for
+  payload: unknown;      // validated against payloadSchema
+  idempotencyKey?: string; // required when the export mutates
+}
+
+interface PlatformResult<T> {
+  ok: true;
+  data: T;
+  requestId: string;
+} | {
+  ok: false;
+  error: {
+    code:
+      | "unauthenticated"
+      | "not_member"
+      | "not_granted"
+      | "not_found"
+      | "validation"
+      | "conflict"
+      | "rate_limited"
+      | "target_unavailable"
+      | "internal";
+    message: string;      // safe for humans; never leaks other tenants
+    retryable: boolean;
+  };
+  requestId: string;
+}
+```
+
+### How a call is authorized
+
+1. The caller is an app server, never a browser. It presents its
+   `PLATFORM_APP_CREDENTIAL` plus the end user's Supabase access token.
+2. The gateway verifies the app credential against `core.apps` and the user
+   token against Supabase Auth.
+3. It confirms **live membership**: `core.org_members` has an active row for
+   `(orgId, userId)`. JWT metadata is never sufficient.
+4. It confirms a grant: `core.app_grants` allows `(orgId, callerSlug,
+   targetSlug, action)`.
+5. It validates `payload` against the target's registered `payloadSchema`.
+6. For `mutates: true`, it checks the idempotency record; a hit returns the
+   stored result without re-executing.
+7. It executes the mapped RPC with the service role, setting
+   `request.org_id`, `request.user_id` and `request.caller_app` as transaction
+   settings so the target's RLS and audit code can read them.
+8. It writes `core.audit_log` for every mutation and every denial.
+
+Any failure before step 7 returns the matching error code and executes
+nothing. The gateway never forwards raw SQL, table names, or another app's
+credentials.
+
+### Shared SDK (`@hbuild/platform`)
+
+Server-only. Browser bundles must not import it; a build-time guard throws if
+`window` is defined, exactly as `src/lib/auth.ts` in the H FORESIGHT planner does.
+
+```ts
+import { platform } from "@hbuild/platform";
+
+const r = await platform.call<AssignmentList>({
+  target: "sight",
+  action: "listAssignments",
+  orgId,
+  payload: { from: "2026-09-01", to: "2026-09-14" },
+});
+if (!r.ok) return fail(r.error);
+```
+
+The SDK also provides:
+
+- `platform.env()` — the validated environment (§15). Reads happen once at
+  startup; a missing required value fails fast with the variable name.
+- `platform.currentUser(request)` — verified user plus live org memberships.
+- `platform.publish(event, payload)` — writes `core.outbox` (§19).
+- `platform.manifest()` — the app's own parsed, validated manifest.
+- `cleanEnv()` — strips one layer of `<>`, quotes, or whitespace from a
+  pasted environment value. Dashboard pastes with placeholder brackets have
+  broken sign-in twice; every app applies this to every env value.
+
+Until the SDK exists as a package it is copied as `src/lib/platform.ts` with an
+identical surface, so that moving to the package later is a one-line import
+change. Record which apps carry the copy in Scratch.
+
+### Direct database access
+
+An app's own server may talk to its own schema directly (H FORESIGHT uses
+postgres.js over the transaction pooler; hbuild-sight uses supabase-js with
+RLS). That is app-internal and allowed. What is never allowed is one app's
+code — server or browser — reading or writing another app's schema. The
+planner's `app_planner.events` are reached by H Ledger only through
+`sight.listAssignments`.
+
+---
+
+## 19. Events and Outbox
+
+Cross-app *notification* uses `core.outbox`; cross-app *reads* use the gateway.
+Events carry identifiers and facts, never balances or totals that a subscriber
+might be tempted to trust without re-reading.
+
+```sql
+core.outbox (
+  id            uuid primary key,
+  org_id        uuid not null,
+  event         text not null,          -- "sight.assignment.changed"
+  entity_id     text not null,
+  payload       jsonb not null,
+  produced_by   text not null,          -- app slug
+  produced_at   timestamptz not null default now(),
+  version       integer not null default 1
+)
+
+core.outbox_deliveries (
+  outbox_id     uuid references core.outbox(id),
+  subscriber    text not null,          -- app slug
+  attempts      integer not null default 0,
+  delivered_at  timestamptz,
+  last_error    text,
+  primary key (outbox_id, subscriber)
+)
+```
+
+Rules:
+
+- The outbox row is written **in the same transaction** as the change it
+  describes. A change with no event, or an event with no change, is a bug.
+- Delivery is at-least-once. Subscribers must be idempotent on
+  `(event, entity_id, version)`.
+- Subscribers are declared in the manifest and enabled per organization by a
+  grant of the form `(orgId, subscriberSlug, producerSlug, "subscribe:{event}")`.
+- A subscriber that needs the full current record calls the producer's
+  export; it does not reconstruct state from event history.
+- Retention: 90 days by default, then archived. Deliveries older than that with
+  no acknowledgement are surfaced in the shell's platform health view, not
+  silently dropped.
+
+Platform events every app should expect:
+
+| Event | Producer | Meaning |
+|---|---|---|
+| `core.org.member_changed` | shell | Membership or role changed; subscribers recheck cached authorization |
+| `core.app.grant_changed` | shell | A grant was added or revoked |
+| `core.org.settings_changed` | shell | Namespaced org settings updated |
+
+---
+
+## 20. Security Release Gate
+
+An app is *releasable* when the evidence below exists in the repository, not
+when someone says it does. Each item names the artifact that proves it. "Done"
+without an artifact is "not done".
+
+| Gate | Evidence required |
+|---|---|
+| Tenant isolation | RLS enabled on every app table (query against `pg_tables` in a test); a test that a member of org A cannot read org B through every export |
+| No browser privilege | No service-role key or platform credential in any client bundle (grep of the built output in CI) |
+| Membership is live | A test that a revoked member is refused within one request, JWT still valid |
+| Grants enforced | A test that an ungranted `(caller, target, action)` returns `not_granted` |
+| Idempotency | A test that repeating a mutating call with the same key executes once |
+| Input validation | Every export rejects an extra property and a wrong type (schema tests) |
+| Secrets hygiene | `.env.example` lists every variable with placeholders; `.gitignore` excludes filled files; no real key in git history |
+| CSP | The deployed response carries a CSP whose `connect-src` names only the app origin, the Supabase project, and the gateway; verified against the live URL |
+| Migrations | Numbered, idempotent, applied by a runner that records `schema_migrations`; no "paste this once" instructions in the README |
+| Audit | Every mutation through the gateway lands in `core.audit_log` (test) |
+| Auth surface | Sign-ups disabled or gated; password reset and session refresh tested on the live origin |
+| Accessibility | Manual VoiceOver pass on the primary flow, recorded in `RELEASE.md` with date and device |
+| Performance | One Lighthouse or WebPageTest run on a throttled mobile profile, numbers recorded |
+| Recovery | A documented restore procedure that has been executed once against a scratch database |
+
+Record the gate as a table in `RELEASE.md` with a checkbox, the artifact path,
+and the date. Unchecked rows are blockers, and the skill's Scratch section
+lists them per app.
+
+---
+
+## 21. Application Lifecycle and the Skill Update Protocol
+
+The mesh compounds: each application should leave the platform more connected
+than it found it. That only happens if what each app learned is written back
+here before the next app starts. This section is the procedure.
+
+### 21.1 Before an app is built
+
+1. Read Scratch §23 first. It is the current state of the mesh: which apps
+   exist, on which Supabase project, with which exports, and which decisions
+   are still open.
+2. List the canonical entities the new app needs (Job, Person, Assignment,
+   Customer, Invoice…). For each, find the owner in the registry. If it has
+   an owner, the new app **imports**; it never creates a second copy.
+3. If an entity has no owner yet, the new app becomes the owner, and its
+   manifest exports it from day one — even if no one imports it yet.
+4. Produce the ten-part implementation report (Repository Discovery through
+   Implementation Phases, per the application prompt wrapper in §22) before
+   writing code.
+
+### 21.2 While building
+
+- Consume existing exports before inventing data. If an export is missing
+  from the producer, file it in Scratch under *Requested exports* with the
+  payload the consumer needs, and stub the consumer honestly.
+- Every new table gets `org_id`, RLS, and an entry in the Database Plan.
+- Every cross-app need becomes a manifest import, never a foreign key into
+  another schema.
+- Keep the app's `RELEASE.md` gate table current as evidence is produced.
+
+### 21.3 After an app ships — update this skill
+
+Update these, in this order, and bump the specification's patch version:
+
+1. **§23.2 App registry** — add or amend the app row: slug, repository
+   folder, stack, hosting, Supabase project, origin (or `TBD`), schema,
+   `platformVersion`, status.
+2. **§23.3 Export catalogue** — every export the app now implements, with
+   its RPC and a one-line payload summary. This is the section the *next*
+   app reads to learn what it can import.
+3. **§23.4 Import and grant ledger** — which app calls which, and whether the
+   grant exists (`granted`, `requested`, `stubbed`).
+4. **§23.5 Shared variables** — environment names, project identifiers,
+   pooler hosts, region, and any value the next app must reuse verbatim.
+   Never the secret values themselves.
+5. **§23.6 Decisions** — anything that deviates from Parts I–IV, with the
+   reason and the intended fix-forward.
+6. **§23.7 Lessons** — operational facts that cost time (the `ENOTFOUND`
+   direct host, the CSP `connect-src`, placeholder brackets). One line each.
+7. **§23.8 Open questions** — owner decisions still needed.
+
+Then hand the updated skill to the next application's prompt via the wrapper
+in §22. The wrapper tells the next build to read this file first, so the
+registry is the hand-off — no separate briefing document is needed.
+
+### 21.4 Optimizing the flow between apps
+
+When updating the skill, also look for these and record proposals in §23.6:
+
+- Two apps computing the same fact (e.g. "days worked on job X in period P")
+  → move it to one export on the owner and delete the copy.
+- A consumer polling the producer → replace with an outbox event plus a
+  targeted re-read.
+- A manual step between apps (export a file, paste an ID) → an export or
+  event that removes the human hop.
+- The same enum or vocabulary in two schemas (`Task/List/Idea`, buckets,
+  statuses) → declare it once in the producer's manifest as a named type and
+  have consumers import the type.
+- A deviation that has now been repeated by a second app → it is a pattern;
+  either promote it into Parts I–IV or schedule the fix.
+
+Do not act on these proposals inside an unrelated app build; record them, and
+let the owner authorize them as their own work.
+
+---
+
+## 22. Application Prompt Wrapper
+
+Every app-specific build prompt is prepended with the governing requirement
+below, verbatim, so that the application prompt defines *what* and this skill
+defines *how*. Keep it in sync with the priority order in §1.
+
+```text
+HBUILD MESH INTEGRATION — GOVERNING REQUIREMENT
+
+This application is part of the existing HBUILD Application Ecosystem.
+Before planning, designing, modifying, or writing code, locate the
+`HBuild_Mesh_Skill.md` (the hbuild-app-ecosystem skill; the workspace-root
+copy is `HBuild_Mesh_Skill.md.txt`) and follow its section 1 reading protocol.
+Treat it as
+the governing platform specification. The application-specific requirements
+below define WHAT this application does; the skill defines HOW it must
+integrate, behave, communicate, authenticate, secure data, and stay consistent
+with the rest of the ecosystem.
+
+Priority: 1 security and tenant isolation, 2 data integrity, 3 accessibility,
+4 shared platform contracts, 5 mobile usability, 6 HBUILD visual consistency,
+7 application-specific preferences. On conflict, follow the skill and document
+the conflict in its Scratch section. Do not silently invent a workaround.
+
+Before implementation, inspect the repository and the skill's registry for:
+AppShell, authentication, organization context, Supabase integration, gateway,
+lib/platform.ts, shared packages and components, design tokens, app registry,
+capabilities, grants, manifests, migrations, RLS, audit logging,
+outbox/events, offline behavior, error and loading states, mobile navigation,
+account and organization switching, existing canonical Job/Project,
+Person/User and Assignment data, Planner integration, existing tests.
+REUSE what exists. Do not rebuild a platform capability inside the app.
+
+Then return, before significant code: 1 Repository Discovery, 2 Reusable
+HBUILD Infrastructure, 3 Data Ownership per entity, 4 Application
+Architecture (Shell → Gateway → Core → this app → other apps), 5 Database
+Plan (reused tables, new tables, ownership, indexes, constraints, RLS,
+migrations), 6 Mesh Contract (imports, exports, capabilities, grants,
+events), 7 Route/Screen Map mobile-first, 8 Security Review, 9 Test Plan
+with acceptance criteria, 10 Implementation Phases as small verifiable
+vertical slices. Proceed unless a material unresolved architecture or
+security decision needs owner input.
+
+Never invent production domains, credentials, organization IDs, grants, or
+vendor entitlements. Use `TBD`.
+
+APPLICATION-SPECIFIC REQUIREMENTS
+[INSERT THE APPLICATION PROMPT BELOW THIS LINE]
+```
+
+---
+
+# PART V — SCRATCH (LIVING REGISTRY)
+
+## 23. Scratch
+
+This part is the mesh's memory. It is factual, dated, and edited after every
+app per §21.3. Nothing here is aspirational: `TBD` means unknown, `planned`
+means not built, and a deviation is a deviation until the fix lands.
+
+Last updated: 2026-09-17 (specification 3.3.0).
+
+### 23.1 Platform facts as they stand
+
+| Item | Value |
+|---|---|
+| `PLATFORM_DOMAIN` | `TBD` — no shell domain chosen; apps live on hosting subdomains |
+| Shell / gateway (`app.{domain}`) | **No shell app.** But `core` now EXISTS (migration in `hbuild-ledger/migrations/core/0001_core.sql`) and the gateway is embedded in H Ledger (`src/lib/platform.ts` + `POST /api/gateway`). No `@hbuild/platform` package yet — H Ledger carries the copy (D-11) |
+| Supabase project A | `hoeowoobioxlluladece` — marketing site (`hbuild-web`), Control Panel, hbuild-sight. Holds the staff logins |
+| Supabase project B | `hiseqnrxuldhfuhqklkh` — still named "HBUILD - SIGHT" in the Supabase dashboard, which is the one place the old name survives (owner to rename; the project id never changes and nothing depends on the label), region `ca-central-1` — H FORESIGHT planner (`app_planner`). Owner logins `austin@` and `alec@hrenovate.com` created by hand |
+| Identity | Supabase Auth email + password in **both** projects. Two identity stores today (deviation D-1) |
+| Organization | One company, two owners. `core.orgs` seeds one org `hbuild`; `core.org_members` is the live membership check. Legacy apps are still implicitly single-tenant (D-2, partially closed) |
+| Design system source | `hbuild-brandkit` v1.0 inside `HBUILD-CPANEL-09-08-26/hbuild-brandkit/` — `css/hbuild-brand.css`, `tokens/hbuild.tokens.json`, `tokens/hbuild-tokens.js`, icon SVGs, head and manifest templates. Its `--hb-*` names map 1:1 onto §6's semantic tokens |
+| Brandkit breakpoints | mobile `<768`, tablet `768–1099`, desktop `≥1100` — differs from §3's 600/1024 (deviation D-3) |
+| Timezone | `America/Denver` (stated by the owner) |
+| Crew | Owners Austin and Alec; workers Julio, Ricky, Aldo; an "Everyone" group |
+| Projects / Jobs | Freeman, Melissa, Mitchell, Dominique, Office, Personal — owned by the planner (`app_planner.projects`, fixed colours). hbuild-sight holds its own `sight_jobs` copy (deviation D-4) |
+
+### 23.2 App registry
+
+| Slug | Name | Folder | Stack | Hosting | Supabase | Origin | Schema | platformVersion | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| `cpanel` | HBUILD Control Panel | `HBUILD-CPANEL-09-08-26` (built output only; source `TBD`) | React SPA (Vite/rolldown), localStorage-first (`hbuild-estimate-state`, `hbuild-planpad-drawings`), Netlify functions `notify.js` (web push / Twilio / Resend) and `stripe.js` (payment links + webhook) | Netlify (zip deploy) | A | `TBD` | none — `public.invoices`, `public.leads`, `public.push_subscriptions` | pre-3.0 | live, legacy |
+| `sight` | HBUILD SIGHT | `hbuild-sight` | React 19 + Vite 7 + Tailwind 4, hash router, local-first (`hbuild-sight:v1`) with optional supabase-js sync, last-write-wins on `updatedAt`, tombstones, Realtime | Hostinger static | A | `TBD` | none — `public.sight_jobs`, `sight_work_items`, `sight_templates`, `sight_settings`; RLS "authenticated full access"; no `org_id` | 3.0.0 partial | live |
+| `planner` | H FORESIGHT (planner / scheduler) | `HBuild-Scheduler-v1.0` | Next.js 15 App Router, postgres.js over the transaction pooler, `@supabase/ssr` auth, middleware page gate, `ALLOWED_EMAILS` second gate, `cleanEnv()` | Netlify `hforesight` → `hforesight.netlify.app`, GitHub `Modder67/Hsight` (repo not yet renamed) | B | `https://hforesight.netlify.app` | `app_planner` (`projects`, `workers`, `captures`, `templates`, `events`, `alerts`, `schema_migrations`) — RLS on, no policies, `anon`/`authenticated` revoked | 3.0.0 | live, verified 2026-09-14 |
+| `ledger` | H LEDGER (HBUILD Money System) | `hbuild-ledger` | Next.js 15 App Router, postgres.js over the transaction pooler, `@supabase/ssr` auth + `core.org_members`, embedded gateway, Zod, Tailwind on the §6 tokens | Netlify `hledger` → `hledger.netlify.app`, GitHub `Modder67/H-Count-Construction-Money-Management-` (repo not yet renamed) | B | `https://hledger.netlify.app` | `app_ledger` (+ `core`, platform-owned) | 3.3.0 | live, renamed from `count` 2026-09-17; 111 tests green |
+
+Naming note — read before renaming anything. `sight` and `planner` are two
+different codebases that both once called themselves "SIGHT":
+
+* **`planner`** — the Next.js scheduler on project B. Its display name became
+  **H FORESIGHT** on 2026-09-17 and its site is now `hforesight.netlify.app`.
+  Its slug stays `planner`, because §17 forbids changing a registered slug and
+  `planner` was always the canonical name. **`planner` is the canonical
+  Planner** (Q-1, answered 2026-09-16).
+* **`sight`** — the frozen local-first Vite app on project A, `hbuild-sight`,
+  with its own `public.sight_*` tables. It was NOT renamed: it is a read-only
+  legacy surface (D-4) and its slug, repo and tables keep their names. "HBUILD
+  SIGHT" in the row above is that app, not the planner.
+
+So "H FORESIGHT" and `sight` are different things, and a sweep that rewrites
+one must not touch the other. The same applies to `ledger`: `app_ledger` is
+the money app's schema, while the English word "count" appears throughout the
+codebase in `count(*)`, `animation-iteration-count` and ordinary prose — a
+blind rename corrupts those silently (see the rename lessons in §23.7).
+
+### 23.3 Export catalogue
+
+What each app can offer through the gateway. *Implemented* means the RPC or
+server route exists today (even if the gateway does not); *declared* means
+written in a manifest but not yet built; *proposed* means this skill is asking
+for it.
+
+| App | Action | RPC / route | Payload → result | State |
+|---|---|---|---|---|
+| `planner` | `listProjects` | `app_planner.rpc_list_projects` | `{}` → `projects[] {id,name,slug,color,sort}` | **implemented** (0003). The planner's own `GET /api/bootstrap` still serves its UI; the RPC is the mesh path |
+| `planner` | `listEvents` | `GET /api/events?from&to` | `{from,to}` → raw events | implemented as a session-authenticated route, **not** a capability. Consumers want `listAssignments`, not raw events |
+| `planner` | `listAssignments` | `app_planner.rpc_list_assignments` | `{from,to,projectId?}` → `assignments[] {id,eventId,jobId,personId,date,dayFraction,bucket,status,holdReason}` — one row per person × day; a group worker is never an assignment; fraction is explicit or derived (all-day = 1.0, timed > 4.5h = 1.0, else 0.5) | **implemented** in `migrations/0003_mesh_exports.sql` (written by the H Ledger build, belongs to the planner) |
+| `planner` | `listPeople` | `app_planner.rpc_list_people` | `{}` → `people[] {id,name,isOwner,isGroup}` — identity only, never pay | **implemented** (0003) |
+| `planner` | `createProject` | `app_planner.rpc_create_project` | `{name,color?}` → `{project}` — slug, colour and sort order are decided by the planner, so a Project created through the gateway is indistinguishable from one created in the planner's own UI | **implemented** (0004), mutating and idempotency-keyed |
+| `sight` | `listJobs` | direct table read today | — | implemented as browser table access, not an export; see D-4 |
+| `cpanel` | `notify` | `POST /.netlify/functions/notify {action:"send",title,body,link?,sms?,email?}` | accepts user token or service role | implemented — candidate for the platform `push-notify` capability |
+| `cpanel` | `createPaymentLink` | `POST /.netlify/functions/stripe {action:"payment_link",invoiceId}` | invoice id → Stripe link; webhook records payment on `public.invoices.data` | implemented — `ledger` should own invoices; see Q-3 |
+| `ledger` | `getLaborQuote` | `app_ledger.rpc_labor_quote` | `{productionDays}` → `{productionDays,incidentalDays,warrantyDays,billedDays,billRateCents,amountCents}` at the org bill rate | **implemented** |
+| `ledger` | `getPayTiers` | `app_ledger.rpc_list_pay_tiers` | `{}` → `tiers[] {id,name,dayRateCents,perDiemCents,dayGrossCents,active}` — per diem computed; refuses a non-management role | **implemented** |
+| `ledger` | `getJobMoneySummary` | `app_ledger.rpc_job_money_summary` | `{jobId}` → sold labor, sold/scheduled days, siteplan flag. **No rates, no payroll** — safe for the planner to display | **implemented** |
+
+### 23.4 Import and grant ledger
+
+| Caller | Target | Action | Purpose | Grant |
+|---|---|---|---|---|
+| `ledger` | `planner` | `listAssignments` | The only thing that becomes payable | **granted** (seeded by `core/0001_core.sql`) |
+| `ledger` | `planner` | `listProjects` | Job identity and colour on every money screen | **granted** |
+| `ledger` | `planner` | `listPeople` | Person identity for tiers, W2/1099 and payroll | **granted** |
+| `ledger` | `planner` | `createProject` | Add a job from the Add-job sheet without leaving H Ledger — the planner still owns Project identity | **granted** (seeded by `core/0002_create_project_capability.sql`) |
+| `ledger` | `cpanel` | `notify` | Payroll cutoff and hold notices | requested (interim; becomes platform capability) |
+| `planner` | `ledger` | `getJobMoneySummary` | Show sold labor and days on a project | **granted** (planner does not call it yet) |
+| `planner` | `ledger` | `getLaborQuote` | Show billable days when an estimate's production days are entered | proposed |
+
+`core.app_grants` now exists and is seeded for the org `hbuild`. A grant is
+proven by test: removing one row makes the gateway answer `not_granted` and
+the consuming screen degrade with a banner rather than break.
+
+### 23.5 Shared variables (names and non-secret values only)
+
+| Name | Where used | Value / rule |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Next.js apps (project B) | `https://hiseqnrxuldhfuhqklkh.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js apps (project B) | publishable key `sb_publishable_…` (new key format, not a JWT) |
+| `VITE_SUPABASE_URL` | Vite apps (project A) | `https://hoeowoobioxlluladece.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Vite apps (project A) | anon key — browser-safe; RLS is the control |
+| `DATABASE_URL` | server-only, project B | **transaction pooler only**: `postgresql://postgres.<ref>:PASSWORD@aws-0-ca-central-1.pooler.supabase.com:6543/postgres`. The direct host `db.<ref>.supabase.co:5432` is IPv6-only and unreachable from Netlify (`ENOTFOUND`) |
+| `ALLOWED_EMAILS` | planner, ledger | comma-separated, no brackets; `cleanEnv()` applied per item |
+| `ORG_TIMEZONE` | planner, ledger | `America/Denver` |
+| `WORKER_PHONES` | planner | server-only JSON `{name: E.164}`; never seeded into the database |
+| `SMS_EVERYONE`, `TWILIO_*`, `WEBHOOK_SECRET` | planner | present, values unset; SMS is queued to `alerts` until configured |
+| `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, `STRIPE_*`, `RESEND_API_KEY` | cpanel functions only | never in a `VITE_`/`NEXT_PUBLIC_` variable, never in a second app |
+| `PLATFORM_GATEWAY_URL` | all apps | Empty today: H Ledger runs the embedded gateway. Setting it forwards `platform.call()` to a shell instead, with no other code change |
+| `PLATFORM_APP_CREDENTIAL` | an app calling INTO another app's gateway | The secret; its sha256 goes in `core.apps.credential_hash` via `platform.hashCredential()`. Only needed once a second app calls in |
+| `NEXT_PUBLIC_APP_SLUG` | §15 contract; **not actually read by either Next.js app** | `ledger`, `planner`, … matches `core.apps.slug`. Both apps take the slug from `app.manifest.json` instead (`const APP_SLUG = manifest.slug`), which is better: one source, and a rename cannot leave the env and the manifest disagreeing. Either drop this variable from §15 or have the env module cross-check it against the manifest — do not set it as a second, silently divergent source |
+| `ledger.*` org settings | H Ledger | `labor_bill_rate_cents` (94500), `scheduled_day_hours` (9), `half_day_per_diem_policy`, `w2_burden_pct`, `overtime_rule`, `overtime_weekly_threshold_hours`, `overtime_multiplier`, `payroll_anchor_date`. Configuration in `core.org_settings`, never code |
+
+Netlify applies environment changes only on a new deploy. Netlify "secret"
+values cannot be read back; keep the non-secret shape here so they can be
+re-entered.
+
+### 23.6 Decisions and deviations
+
+| ID | Decision / deviation | Why | Fix-forward |
+|---|---|---|---|
+| D-1 | Two production Supabase projects (A and B) despite §14 "one project" | H FORESIGHT was started on a fresh project; the Control Panel and hbuild-sight predate the spec | Owner decision Q-2. Until then, new apps join **B** and treat A as legacy to be migrated, not extended |
+| D-2 | No `core` schema, no `org_id` anywhere | Single company, two owners; the platform layer was never built | **Largely closed 2026-09-16.** `core` exists on project B with orgs, members, apps, capabilities, grants, settings, audit, outbox, idempotency; `planner` and `ledger` are registered; `app_ledger` carries `org_id` + RLS on every table. Still open: `app_planner` and the legacy `public.sight_*` tables have no `org_id` — they get one when the planner takes its next migration |
+| D-3 | Brandkit breakpoints 768/1100 vs §3's 600/1024 | Brandkit was extracted from the Control Panel | Use the brandkit values in `hb-*` CSS as-is; apps built on §6 tokens keep 600/1024. Reconcile when the shared component package is created (proposal P-2) |
+| D-4 | hbuild-sight keeps its own `sight_jobs` and reads tables from the browser | Local-first design predates the mesh | Freeze hbuild-sight's schema. Do not extend it. Q-1 is answered — `planner` is canonical, so `sight` is a read-only legacy surface: migrate what it holds when Q-2 is closed, never extend it |
+| D-5 | H FORESIGHT has no shell, no gateway, no manifest exports; API routes are session-authenticated and same-origin | Built to §14–16 data rules but before the platform layer existed | Add `app.manifest.json` exports (§23.3) and `rpc_list_assignments`; the gateway calls them once it exists |
+| D-6 | H FORESIGHT's `ALLOWED_EMAILS` is a second gate on top of Auth | Sign-ups are off but there is no membership table | Replaced by `core.org_members` when D-2 lands |
+| D-7 | Migrations are pasted into the Supabase SQL editor by hand | Small team; `npm run db:migrate` exists but needs the direct host | Keep files numbered and idempotent with `schema_migrations`; the runner becomes required at the §20 gate |
+| D-8 | H Ledger will reference the planner's Job and Person by **id through imports**, never by foreign key | §14 — no cross-schema keys | None; this is the rule |
+| D-9 | Per diem is computed (`25 + 0.20 × dayRate`) in one server function and never stored as an independent column | Owner rule; prevents drift | None |
+| D-10 | Client Ledger and People Ledger share Job and calendar day only; no table joins the two balances | Owner rule (§23.9) | None. Enforced by schema and asserted by test: the `/api/ledger` payload is checked to contain no `day_rate`, `per_diem`, `gross` or `payroll` |
+| D-11 | The gateway is **embedded in H Ledger** (`src/lib/platform.ts` in-process, plus `POST /api/gateway` for other apps to call in) rather than living in a shell at `app.{domain}` | No shell repository or domain exists (Q-7). Waiting would have blocked the app; building a second gateway later would be worse | Set `PLATFORM_GATEWAY_URL` when the shell exists — `platform.call()` already forwards instead. Move `migrations/core/` to the shell repo at the same time |
+| D-12 | `migrations/core/0001_core.sql` lives in the H Ledger repository | Same reason as D-11; it is platform-owned, not app-owned | Move, do not fork, when the shell repo exists. Marked as such in the file header |
+| D-13 | H Ledger reads planner assignments into `app_ledger.assignment_cache` (a read model) rather than calling the gateway on every screen | A job page would otherwise make one cross-app call per render | The cache is refreshed explicitly and is never authoritative: freeze snapshots into `pay_lines`. Replace the manual refresh with a `planner.assignment.changed` subscription when the planner publishes it (P-5) |
+| D-14 | The app's registered slug changed from `count` to `ledger` on 2026-09-17, which §17 otherwise forbids | The rename happened while `app_count` still held **no business data** — 0 jobs, 0 charges, 0 pay lines, 0 invoices, 0 people, only the five seeded pay tiers — so no history could be orphaned. §17's rule exists to protect references to accumulated data; there was none to protect | **This does not reopen §17.** `ledger` is now fixed forever. The migration that did it, `core/0003_rename_count_to_ledger.sql`, is the reference for how a slug move is done safely if it is ever justified again: insert the new identity, repoint every referrer, delete the old row — never `update ... set slug`, because six non-deferrable foreign keys point at `core.apps(slug)` |
+
+### 23.7 Lessons (operational, one line each)
+
+- Placeholder brackets from a template (`<https://…>`) pasted into a hosting
+  dashboard break sign-in silently — `cleanEnv()` on every value.
+- A CSP with `connect-src 'self'` blocks supabase-js in the browser and the
+  login page reports it as a wrong password. Name the Supabase origin.
+- Supabase direct connections are IPv6-only; Netlify functions get
+  `getaddrinfo ENOTFOUND`. Use the transaction pooler (port 6543,
+  `postgres.<ref>` user, `prepare: false`).
+- In a connection URI the `@` before the host is literal; only characters
+  *inside* the password are percent-encoded.
+- Netlify env changes need a new deploy. Function logs live under Logs →
+  Functions → "Next.js Server Handler".
+- Supabase's "Add user" must have *Auto Confirm User* ticked or the account
+  cannot sign in; the dashboard cannot show or change an existing password.
+- OneDrive-synced folders can revert a file written by a tool moments later;
+  verify size or hash before asking for a commit.
+- The Supabase SQL editor warns when a new table lacks RLS — put the
+  `enable row level security` and `revoke` lines in the migration itself.
+- **postgres.js encodes JSON parameters itself.** `${JSON.stringify(x)}::jsonb`
+  double-encodes — the value arrives as a JSON *string* and every
+  `payload->>'key'` returns null. Use `sql.json(x)`. This silently broke every
+  gateway call and every org setting until an acceptance test caught it.
+- `next start` serves the **built** output: rebuild before an acceptance run,
+  or the suite tests the code you had ten minutes ago.
+- A Postgres URL with a unix-socket host (`?host=/tmp`) is not a valid `URL`
+  for `new URL()`. Test harnesses should use TCP.
+- Put both schemas in one throwaway test database: the gateway then executes a
+  real cross-app RPC, and the mesh contract is tested instead of mocked.
+- A gateway call that mutates needs its target's business errors mapped, not
+  swallowed: Postgres `P0001` / `23505` / `23514` become `conflict`, so a
+  duplicate project name reaches the user as "that name already exists"
+  instead of `internal`.
+- **`ALTER SCHEMA ... RENAME` does not rewrite function bodies.** Tables,
+  indexes, triggers and stored generated columns follow by OID, but `prosrc`
+  and a `SET search_path` are plain text: four functions kept a literal
+  `app_count`, including all three gateway RPCs. Rewrite them with
+  `pg_get_functiondef()` + `replace()` + `execute` so nothing is hand-retyped.
+- A setting **key** inside a function body is text too. `rpc_labor_quote` read
+  `'count.labor_bill_rate_cents'`; renaming the row without renaming the
+  literal made every quote raise "not configured for this organization".
+- Rehearse a rename against a database rebuilt from the migration files before
+  touching the live one. The first attempt here failed on
+  `capabilities_app_slug_fkey` and the second had the settings-key bug — both
+  found in rehearsal, neither reaching production.
+- **A blind `s/count/ledger/` corrupts real code.** It turned
+  `animation-iteration-count` into nonsense inside a `prefers-reduced-motion`
+  block. Replace the bare slug only when it is not preceded by a letter,
+  underscore, dot or hyphen and not followed by a letter, underscore or `(` —
+  and in a repo that never owned the slug, replace literals only.
+
+### 23.8 Open questions for the owner
+
+| ID | Question | Why it matters |
+|---|---|---|
+| Q-1 | ~~Which is the canonical Planner?~~ **Answered: `planner` (H FORESIGHT, project B).** H Ledger imports from it and `sight` is frozen | settled 2026-09-16 |
+| Q-2 | Consolidate onto one Supabase project? **Project B is now the mesh** (`core`, `app_planner`, `app_ledger`). Still to decide: when the Control Panel's `invoices`, `leads`, `push_subscriptions` and the staff logins move off A | Every new app deepens the split until this is done |
+| Q-3 | **Decided: H Ledger owns invoices and payments.** `app_ledger.invoices`, `invoice_lines`, `payments` are built and tested. Still to do: migrate the Control Panel's `public.invoices` rows and point the Stripe function at H Ledger (or retire it) | Two invoice tables exist until then |
+| Q-4 | ~~H Ledger spec missing after §9 step 5~~ **Supplied and built.** Open sub-decisions are now config, not gaps: half-day per diem policy, W2 burden %, overtime rule — all exposed in Settings with honest defaults | settled 2026-09-16 |
+| Q-5 | Do Julio, Ricky and Aldo get logins, or stay assignment targets only? | `core.org_role` has `field` (own schedule only) ready for them. `listPeople` exposes no auth id, so giving them logins is a membership change, not a schema change |
+| Q-6 | Should "Everyone" ever message the whole crew, or stay owners-only? | Affects `notify` grants |
+| Q-7 | `PLATFORM_DOMAIN` — which domain will carry `app.` and the app subdomains? | Cookies, CSP and manifest origins all depend on it |
+| Q-8 | Which of Julio, Ricky, Aldo are W2 and which are 1099, and what tier is each on? | Payroll cannot be frozen until every scheduled W2 worker has a tier — the checklist blocks it by design |
+| Q-9 | The real W2 burden percentage, and the overtime rule to apply | Both default to inert (`0`, `none`) so nothing is invented; job costing understates burden until set |
+
+### 23.9 Domain rules received for H Ledger (verbatim intent, spec §1–§9.5)
+
+Recorded here so the next build and the planner's `listAssignments` export are
+designed against the same rules.
+
+- Labor sells at **$945 per worker-day** (store as `94500` cents, as an org
+  setting, never a literal in code).
+- Incidental days: `> 4 → 2`, `≥ 2 → 1`, else `0`. Exactly 4 production days
+  gets 1; 4.5 gets 2.
+- Every project with production labor gets `warranty_days = 1`.
+- `billed_labor_days = production + incidental + warranty`. Incidental and
+  warranty days are **customer billing allowances**; they never create
+  assignments or payroll.
+- Two bounded contexts: **Client Ledger** (estimates, labor charges, days,
+  materials, other charges, deposits, invoices, AR → QBO) and **People
+  Ledger** (employees, tiers, assignments, day rates, per diem, payroll runs,
+  holds, cancellations → payroll system). They share Job and calendar day,
+  never balances.
+- **Only a Planner Assignment can become payable**: `Person × Job × Date ×
+  DayFraction (1.0 | 0.5)`, `bucket ∈ {production, incidental, warranty}`,
+  `status ∈ {scheduled, held, cancelled}`. No timesheets or hourly clock in V1.
+- Pay tiers (management-editable): Proven I, Proven II, Craftsman, Lead,
+  Master, each with a day rate; `per_diem = 25 + 0.20 × day_rate`;
+  `day_gross = day_rate + per_diem`. Tier amounts live in `app_ledger` config,
+  not in this file.
+- `PersonType = "W2" | "1099"`. Only W2 enters a PayrollRun; 1099 is a future
+  SubBill system. Never mixed.
+- Planner cannot assign until `job.siteplan_ready = true`; the UI says
+  "Siteplan must be released before workers can be scheduled."
+- Payroll is **biweekly**: determine the period, freeze assignments in it,
+  include W2 only, include `scheduled` assignments, … *(steps 5 onward: Q-4)*.
+
+### 23.10 Proposals for the next update (§21.4)
+
+| ID | Proposal | Trigger |
+|---|---|---|
+| ~~P-1~~ | ~~Build the minimum `core` on project B~~ **Done 2026-09-16** — `core` + embedded gateway shipped with H Ledger | closed |
+| P-2 | Extract a `@hbuild/ui` package from `hbuild-brandkit` + H FORESIGHT's `components/ui.tsx` so §8's shared components stop being re-implemented per app | Third app starting |
+| P-3 | Move `notify` out of the Control Panel into a platform `push-notify` capability owned by the shell | Both `planner` (alerts) and `ledger` (payroll notices) need it |
+| ~~P-4~~ | ~~Planner gains `day_fraction`, `bucket`, and a `held` status on its assignment model~~ **Done 2026-09-16** — added by `app_planner` migration `0003_mesh_exports.sql`, so `listAssignments` is honest rather than derived | closed |
+| P-5 | Planner publishes `planner.assignment.changed` to `core.outbox` in the same transaction as an event write, and H Ledger subscribes — replacing the manual "Import from Planner" button (§21.4: a consumer polling the producer) | H Ledger has a refresh button a human must press |
+| P-6 | Move `migrations/core/` and `src/lib/platform.ts` into a shell repository and publish `@hbuild/platform`; H Ledger then imports it and sets `PLATFORM_GATEWAY_URL` | D-11, D-12 — a third app would otherwise copy the gateway again |
+| P-7 | The planner imports `ledger.getLaborQuote` so entering production days on an estimate shows billable days and sold labor without leaving the planner (§21.4: removing a human hop) | Both apps now know half the answer |
+| P-8 | `day_fraction` / `bucket` / `assignment_status` now exist on `app_planner.events` but the planner's own UI cannot set them — a scheduler cannot mark a day incidental or held | The columns default correctly, so nothing breaks; but holds can only be set in SQL today |
+| P-9 | Rename the two GitHub repositories (`Modder67/Hsight`, `Modder67/H-Count-Construction-Money-Management-`) and the Supabase project label "HBUILD - SIGHT" — the last places the old names survive | Owner action; nothing in code depends on them, so this is cosmetic but confusing while it lasts |
+
+---
+
+## 24. Changelog
+
+- **Maintenance guidance revision (2026-09-22; platform contracts remain
+  3.3.0)** — Section 1 and the prompt wrapper now support bounded reading
+  for routine maintenance. Workspace `MAINTENANCE.md` adds owner routing,
+  evidence-based updates to existing records, and compact unfinished-work
+  handoffs. Security, business contracts, and release gates are unchanged.
+
+- **3.3.0 (2026-09-17)** — **H COUNT became H LEDGER and H SIGHT became
+  H FORESIGHT.** The money app's slug, schema (`app_ledger`), capability RPCs,
+  grants, event topics and `ledger.*` org settings all moved with it
+  (`core/0003_rename_count_to_ledger.sql`, rehearsed then applied; 111 tests
+  green after). The planner keeps slug `planner` per §17 — only its display
+  name and origin changed, to `hforesight.netlify.app`. The frozen `sight` app
+  was deliberately left alone; the naming note in §23.2 says why. Project
+  creation through the gateway added (`planner.createProject`, D-14, P-9) and
+  five new lessons recorded per §21.3.
+- **3.2.0 (2026-09-16)** — H Ledger built. `core` and the embedded gateway
+  exist (D-11, D-12); the planner's three exports are implemented (0003);
+  grants are seeded and proven by test. Q-1, Q-3 and Q-4 answered; Q-2
+  narrowed. Registry, export catalogue, grant ledger, shared variables,
+  deviations D-11…D-13, five new lessons (including the postgres.js JSON
+  double-encoding trap) and proposals P-5…P-8 recorded per §21.3.
+- **3.1.0 (2026-09-16)** — Completed §17 (manifest rules); added §18 Gateway
+  and SDK, §19 Events and Outbox, §20 Security Release Gate, §21 Application
+  Lifecycle and Skill Update Protocol, §22 Application Prompt Wrapper, and
+  Part V Scratch with the registry of `cpanel`, `sight`, `planner`, and the
+  planned money app (registered as `count` at the time; now `ledger`).
+  Recorded deviations D-1…D-10, lessons, open questions Q-1…Q-7, and the money
+  app's domain rules as received.
+- **3.0.0** — Parts I–IV as originally written; §17 ended mid-example.
