@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 type Project = { id: string; name: string; slug: string; color: string; sort: number };
+export type ProjectDetails = {
+  projectId: string;
+  jobCode: string | null;
+  customerName: string | null;
+  customerAddress: string | null;
+  clientSource: 'ledger' | 'draft-link' | 'missing';
+};
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -16,10 +23,12 @@ export function MeshProjectPicker({
   projectId,
   projectName,
   onSelect,
+  onDetails,
 }: {
   projectId?: string;
   projectName?: string;
   onSelect: (project: { id: string; name: string } | null) => void;
+  onDetails: (projectId: string, details: ProjectDetails | null) => void;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
@@ -29,8 +38,12 @@ export function MeshProjectPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [connectionReady, setConnectionReady] = useState<boolean | null>(null);
-  const selectionRef = useRef({ projectId, onSelect });
-  selectionRef.current = { projectId, onSelect };
+  const [details, setDetails] = useState<ProjectDetails | null>(null);
+  const [detailError, setDetailError] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const selectionRef = useRef({ projectId, onSelect, onDetails });
+  selectionRef.current = { projectId, onSelect, onDetails };
 
   useEffect(() => {
     fetch('/api/mesh/status')
@@ -76,6 +89,36 @@ export function MeshProjectPicker({
     });
     return () => controller.abort();
   }, [session?.access_token]);
+
+  useEffect(() => {
+    setDetails(null);
+    setDetailError('');
+    if (!session || !projectId || !projects.some(p => p.id === projectId)) return;
+    const controller = new AbortController();
+    setDetailLoading(true);
+    fetch(`/api/mesh/projects/${encodeURIComponent(projectId)}/details`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      signal: controller.signal,
+    }).then(async response => {
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Verified job details unavailable.');
+      if (body.projectId !== projectId || !['ledger', 'draft-link', 'missing'].includes(body.clientSource)) {
+        throw new Error('Invalid job detail response.');
+      }
+      if (!controller.signal.aborted) {
+        setDetails(body as ProjectDetails);
+        selectionRef.current.onDetails(projectId, body as ProjectDetails);
+      }
+    }).catch(err => {
+      if (!controller.signal.aborted) {
+        setDetailError(err instanceof Error ? err.message : 'Verified job details unavailable.');
+        selectionRef.current.onDetails(projectId, null);
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setDetailLoading(false);
+    });
+    return () => controller.abort();
+  }, [projectId, session?.access_token, projects, detailAttempt]);
 
   const filtered = useMemo(() =>
     projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -134,10 +177,26 @@ export function MeshProjectPicker({
           {projectId && !projects.some(p => p.id === projectId) && !loading && (
             <p className="text-sm text-amber-400">Previously selected project {projectName || ''} could not be verified. Choose another project before saving.</p>
           )}
+          {projectId && details && (
+            <div className="text-sm text-muted-foreground" role="status">
+              <p>Job code: <strong className="text-foreground">{details.jobCode || 'Not assigned'}</strong></p>
+              <p>{details.clientSource === 'ledger' ? 'Client details checked against H Ledger.' :
+                details.clientSource === 'draft-link' ? 'Client name is from the H Draft link; live ledger details are unavailable.' :
+                'No linked client details are available.'}</p>
+              {!details.customerAddress && <p>Verified client address is unavailable.</p>}
+            </div>
+          )}
+          {detailLoading && <p className="text-sm text-muted-foreground" role="status">Checking H Draft job details…</p>}
+          {detailError && projectId && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-amber-400" role="status">{detailError} Client details entered below are manual and unverified.</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => setDetailAttempt(n => n + 1)}>Retry details</Button>
+            </div>
+          )}
         </>
       )}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <p className="text-xs text-muted-foreground">Project names come from H FORESIGHT. Client name, address, and job code are not available from the approved project-list action; any details entered below are manual and unverified.</p>
+      <p className="text-xs text-muted-foreground">Project names come from H FORESIGHT. H Draft supplies linked job details only when its signed source is available; manually entered details are not verified.</p>
     </div>
   );
 }

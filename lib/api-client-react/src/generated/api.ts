@@ -17,6 +17,7 @@ import type {
   GetMeshStatus200,
   HealthStatus,
   ListMeshProjects200,
+  MeshProjectDetails,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -170,6 +171,94 @@ export function useListMeshProjects<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListMeshProjectsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read H Draft job details after verifying canonical project access
+ */
+export const getGetMeshProjectDetailsUrl = (id: string) => {
+  return `/api/mesh/projects/${id}/details`;
+};
+
+export const getMeshProjectDetails = async (
+  id: string,
+  options?: RequestInit,
+): Promise<MeshProjectDetails> => {
+  return customFetch<MeshProjectDetails>(getGetMeshProjectDetailsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMeshProjectDetailsQueryKey = (id: string) => {
+  return [`/api/mesh/projects/${id}/details`] as const;
+};
+
+export const getGetMeshProjectDetailsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMeshProjectDetails>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMeshProjectDetails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMeshProjectDetailsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMeshProjectDetails>>
+  > = ({ signal }) => getMeshProjectDetails(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMeshProjectDetails>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMeshProjectDetailsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMeshProjectDetails>>
+>;
+export type GetMeshProjectDetailsQueryError = ErrorType<void>;
+
+/**
+ * @summary Read H Draft job details after verifying canonical project access
+ */
+
+export function useGetMeshProjectDetails<
+  TData = Awaited<ReturnType<typeof getMeshProjectDetails>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMeshProjectDetails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMeshProjectDetailsQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

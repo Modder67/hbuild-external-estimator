@@ -10,3 +10,5 @@ export * from "./getMeshStatus200";
 export * from "./healthStatus";
 export * from "./listMeshProjects200";
 export * from "./meshProject";
+export * from "./meshProjectDetails";
+export * from "./meshProjectDetailsClientSource";

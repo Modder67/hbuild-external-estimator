@@ -13,6 +13,26 @@ export interface MeshProject {
   sort: number;
 }
 
+export type MeshProjectDetailsClientSource =
+  (typeof MeshProjectDetailsClientSource)[keyof typeof MeshProjectDetailsClientSource];
+
+export const MeshProjectDetailsClientSource = {
+  ledger: "ledger",
+  "draft-link": "draft-link",
+  missing: "missing",
+} as const;
+
+export interface MeshProjectDetails {
+  projectId: string;
+  /** @nullable */
+  jobCode: string | null;
+  /** @nullable */
+  customerName: string | null;
+  /** @nullable */
+  customerAddress: string | null;
+  clientSource: MeshProjectDetailsClientSource;
+}
+
 export interface HealthStatus {
   status: string;
 }

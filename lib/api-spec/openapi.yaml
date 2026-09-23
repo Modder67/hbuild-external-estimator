@@ -56,6 +56,35 @@ paths:
           description: Membership or app grant denied
         "503":
           description: Mesh not configured or unavailable
+  /mesh/projects/{id}/details:
+    get:
+      operationId: getMeshProjectDetails
+      tags: [mesh]
+      summary: Read H Draft job details after verifying canonical project access
+      security:
+        - userAccessToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Verified H Draft project linkage and available client details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeshProjectDetails"
+        "400":
+          description: Invalid project identifier
+        "401":
+          description: Missing or invalid user session
+        "403":
+          description: User or app grant denied
+        "404":
+          description: Project not available or not linked in H Draft
+        "503":
+          description: Source not provisioned or temporarily unavailable
   /healthz:
     get:
       operationId: healthCheck
@@ -85,6 +114,16 @@ components:
         slug: { type: string }
         color: { type: string }
         sort: { type: integer }
+    MeshProjectDetails:
+      type: object
+      additionalProperties: false
+      required: [projectId, jobCode, customerName, customerAddress, clientSource]
+      properties:
+        projectId: { type: string, format: uuid }
+        jobCode: { type: [string, "null"] }
+        customerName: { type: [string, "null"] }
+        customerAddress: { type: [string, "null"] }
+        clientSource: { type: string, enum: [ledger, draft-link, missing] }
     HealthStatus:
       type: object
       properties:

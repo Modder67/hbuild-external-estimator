@@ -30,6 +30,21 @@ export const ListMeshProjectsResponse = zod.object({
 });
 
 /**
+ * @summary Read H Draft job details after verifying canonical project access
+ */
+export const GetMeshProjectDetailsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetMeshProjectDetailsResponse = zod.object({
+  projectId: zod.string().uuid(),
+  jobCode: zod.string().nullable(),
+  customerName: zod.string().nullable(),
+  customerAddress: zod.string().nullable(),
+  clientSource: zod.enum(["ledger", "draft-link", "missing"]),
+});
+
+/**
  * Returns server health status
  * @summary Health check
  */

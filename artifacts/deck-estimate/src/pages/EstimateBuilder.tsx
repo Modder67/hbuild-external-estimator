@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, FileText, Trash2, Home, Box, Grid3X3, Hammer, 
@@ -11,7 +11,7 @@ import { generateEstimatePDF } from '@/lib/pdfExport';
 import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { generateExcelExport } from '@/lib/excelExport';
 import { useToast } from '@/hooks/use-toast';
-import { MeshProjectPicker } from '@/components/MeshProjectPicker';
+import { MeshProjectPicker, type ProjectDetails } from '@/components/MeshProjectPicker';
 
 // --- UI Components ---
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -26,6 +26,7 @@ export default function EstimateBuilder() {
     state, 
     updateJobDetails, 
     selectProject,
+    applyProjectDetails,
     updateMeasurement, 
     addMeasurementSegment, 
     removeMeasurementSegment,
@@ -39,6 +40,7 @@ export default function EstimateBuilder() {
   } = useEstimateForm();
   
   const { toast } = useToast();
+  const [verifiedDetails, setVerifiedDetails] = useState<ProjectDetails | null>(null);
 
   const pricing = useMemo(() => calculatePricing(state), [state]);
 
@@ -108,7 +110,13 @@ export default function EstimateBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
-            <MeshProjectPicker projectId={state.projectId} projectName={state.projectName} onSelect={selectProject} />
+            <MeshProjectPicker projectId={state.projectId} projectName={state.projectName}
+              onSelect={project => { setVerifiedDetails(null); selectProject(project); }}
+              onDetails={(projectId, details) => {
+                if (projectId !== state.projectId) return;
+                setVerifiedDetails(details);
+                if (details) applyProjectDetails(projectId, details.customerName, details.customerAddress);
+              }} />
             <div className="space-y-2">
               <Label>Salesperson</Label>
               <Input 
@@ -128,19 +136,24 @@ export default function EstimateBuilder() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Customer Name</Label>
+              <Label>Customer Name {verifiedDetails && verifiedDetails.projectId === state.projectId &&
+                verifiedDetails.customerName === state.jobDetails.customerName &&
+                <span className="text-xs text-muted-foreground">({verifiedDetails.clientSource === 'ledger' ? 'H Ledger' : 'H Draft link'})</span>}</Label>
               <Input 
                 value={state.jobDetails.customerName}
-                onChange={(e) => updateJobDetails('customerName', e.target.value)}
+                onChange={(e) => { setVerifiedDetails(null); updateJobDetails('customerName', e.target.value); }}
                 placeholder="John & Jane Doe"
                 className="bg-background/50 border-muted"
               />
             </div>
             <div className="space-y-2">
-              <Label>Customer Address</Label>
+              <Label>Customer Address {verifiedDetails && verifiedDetails.projectId === state.projectId &&
+                verifiedDetails.clientSource === 'ledger' &&
+                verifiedDetails.customerAddress === state.jobDetails.customerAddress &&
+                <span className="text-xs text-muted-foreground">(H Ledger)</span>}</Label>
               <Input 
                 value={state.jobDetails.customerAddress}
-                onChange={(e) => updateJobDetails('customerAddress', e.target.value)}
+                onChange={(e) => { setVerifiedDetails(null); updateJobDetails('customerAddress', e.target.value); }}
                 placeholder="123 Main St, Littleton CO"
                 className="bg-background/50 border-muted"
               />
@@ -155,7 +168,7 @@ export default function EstimateBuilder() {
               />
             </div>
             <div className="md:col-span-2 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-              Hdocs save is not available yet: its file upload action and verified client/job-code lookup are not implemented in the mesh. PDF and Excel downloads below still work.
+              Hdocs save is not available yet: its private bucket and file upload worker have not been deployed. PDF and Excel downloads below still work.
             </div>
           </CardContent>
         </Card>

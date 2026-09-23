@@ -90,6 +90,21 @@ export function useEstimateForm() {
     });
   };
 
+  const applyProjectDetails = (projectId: string, customerName: string | null, customerAddress: string | null) => {
+    setState(prev => {
+      // A late response from a previous selection must never overwrite this job.
+      if (prev.projectId !== projectId) return prev;
+      return {
+        ...prev,
+        jobDetails: {
+          ...prev.jobDetails,
+          customerName: customerName ?? prev.jobDetails.customerName,
+          customerAddress: customerAddress ?? prev.jobDetails.customerAddress,
+        },
+      };
+    });
+  };
+
   const updateMeasurement = (type: MeasurementType, index: number, value: string) => {
     setState(prev => {
       const newArr = [...prev.measurements[type]];
@@ -170,6 +185,7 @@ export function useEstimateForm() {
     state,
     updateJobDetails,
     selectProject,
+    applyProjectDetails,
     updateMeasurement,
     addMeasurementSegment,
     removeMeasurementSegment,
