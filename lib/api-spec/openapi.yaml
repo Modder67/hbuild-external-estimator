@@ -13,6 +13,22 @@ tags:
   - name: mesh
     description: Authorized HBUILD mesh reads
 paths:
+  /mesh/status:
+    get:
+      operationId: getMeshStatus
+      tags: [mesh]
+      summary: Check whether server-side mesh access is configured
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [configured]
+                properties:
+                  configured: { type: boolean }
   /mesh/projects:
     get:
       operationId: listMeshProjects

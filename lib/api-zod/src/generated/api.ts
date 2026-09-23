@@ -8,6 +8,13 @@
 import * as zod from "zod";
 
 /**
+ * @summary Check whether server-side mesh access is configured
+ */
+export const GetMeshStatusResponse = zod.object({
+  configured: zod.boolean(),
+});
+
+/**
  * @summary List canonical planner projects through the mesh gateway
  */
 export const ListMeshProjectsResponse = zod.object({

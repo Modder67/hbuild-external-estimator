@@ -1,0 +1,1 @@
+- [Hdocs file storage](hdocs-storage-decision.md) — owner chose private Supabase Storage for PDFs; preserve Hdocs ownership and worker-mediated access.

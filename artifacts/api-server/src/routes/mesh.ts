@@ -3,6 +3,18 @@ import { ListMeshProjectsResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
+router.get("/mesh/status", (_req, res): void => {
+  res.json({
+    configured: Boolean(
+      process.env.PLATFORM_GATEWAY_URL?.startsWith("https://") &&
+      process.env.PLATFORM_APP_CREDENTIAL &&
+      process.env.HBUILD_ORG_ID &&
+      process.env.SUPABASE_URL?.startsWith("https://") &&
+      process.env.SUPABASE_PUBLISHABLE_KEY,
+    ),
+  });
+});
+
 router.get("/mesh/projects", async (req, res): Promise<void> => {
   const gatewayUrl = process.env.PLATFORM_GATEWAY_URL?.trim();
   const credential = process.env.PLATFORM_APP_CREDENTIAL?.trim();

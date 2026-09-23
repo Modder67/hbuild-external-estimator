@@ -17,6 +17,10 @@ export interface HealthStatus {
   status: string;
 }
 
+export type GetMeshStatus200 = {
+  configured: boolean;
+};
+
 export type ListMeshProjects200 = {
   projects: MeshProject[];
 };

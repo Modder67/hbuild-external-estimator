@@ -13,7 +13,11 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus, ListMeshProjects200 } from "./api.schemas";
+import type {
+  GetMeshStatus200,
+  HealthStatus,
+  ListMeshProjects200,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -23,6 +27,81 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Check whether server-side mesh access is configured
+ */
+export const getGetMeshStatusUrl = () => {
+  return `/api/mesh/status`;
+};
+
+export const getMeshStatus = async (
+  options?: RequestInit,
+): Promise<GetMeshStatus200> => {
+  return customFetch<GetMeshStatus200>(getGetMeshStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMeshStatusQueryKey = () => {
+  return [`/api/mesh/status`] as const;
+};
+
+export const getGetMeshStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMeshStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMeshStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMeshStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMeshStatus>>> = ({
+    signal,
+  }) => getMeshStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMeshStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMeshStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMeshStatus>>
+>;
+export type GetMeshStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check whether server-side mesh access is configured
+ */
+
+export function useGetMeshStatus<
+  TData = Awaited<ReturnType<typeof getMeshStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMeshStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMeshStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List canonical planner projects through the mesh gateway

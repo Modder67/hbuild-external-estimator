@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./getMeshStatus200";
 export * from "./healthStatus";
 export * from "./listMeshProjects200";
 export * from "./meshProject";

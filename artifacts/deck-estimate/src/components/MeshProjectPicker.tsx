@@ -28,8 +28,19 @@ export function MeshProjectPicker({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [connectionReady, setConnectionReady] = useState<boolean | null>(null);
   const selectionRef = useRef({ projectId, onSelect });
   selectionRef.current = { projectId, onSelect };
+
+  useEffect(() => {
+    fetch('/api/mesh/status')
+      .then(async response => {
+        if (!response.ok) throw new Error('Mesh server unavailable');
+        const body = await response.json();
+        setConnectionReady(body.configured === true);
+      })
+      .catch(() => setConnectionReady(false));
+  }, []);
 
   useEffect(() => {
     if (!auth) return;
@@ -88,8 +99,10 @@ export function MeshProjectPicker({
         <Label htmlFor="project-search">HBUILD Project</Label>
         {session && <Button type="button" size="sm" variant="ghost" onClick={() => void auth?.auth.signOut()}>Sign out</Button>}
       </div>
-      {!auth ? (
-        <p className="text-sm text-amber-400" role="status">Mesh sign-in is not configured. You can still create and download estimates locally.</p>
+      {!auth || connectionReady === false ? (
+        <p className="text-sm text-amber-400" role="status">Mesh project access is not provisioned yet. You can still create and download estimates locally.</p>
+      ) : connectionReady === null ? (
+        <p className="text-sm text-muted-foreground" role="status">Checking project connection…</p>
       ) : !session ? (
         <form onSubmit={signIn} className="flex flex-col sm:flex-row gap-2">
           <Input type="email" autoComplete="username" placeholder="HBUILD email" aria-label="HBUILD email" value={email} onChange={e => setEmail(e.target.value)} required />
