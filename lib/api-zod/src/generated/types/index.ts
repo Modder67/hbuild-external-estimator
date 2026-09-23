@@ -7,3 +7,5 @@
  */
 
 export * from "./healthStatus";
+export * from "./listMeshProjects200";
+export * from "./meshProject";

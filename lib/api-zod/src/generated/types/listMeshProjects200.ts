@@ -5,17 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface MeshProject {
-  id: string;
-  name: string;
-  slug: string;
-  color: string;
-  sort: number;
-}
-
-export interface HealthStatus {
-  status: string;
-}
+import type { MeshProject } from "./meshProject";
 
 export type ListMeshProjects200 = {
   projects: MeshProject[];

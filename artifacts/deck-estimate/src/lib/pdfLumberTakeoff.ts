@@ -12,11 +12,11 @@ const SECTIONS: { key: keyof PricingBreakdown['lumber']; label: string; note?: s
   { key: 'post', label: 'Posts', note: 'exact qty' },
 ];
 
-export async function generateLumberTakeoffPDF(state: EstimateState, breakdown: PricingBreakdown) {
+export async function generateLumberTakeoffPDF(state: EstimateState, breakdown: PricingBreakdown, options: { download?: boolean } = {}) {
   // Fetch logo
   let logoDataUrl: string | null = null;
   try {
-    const res = await fetch('/hbuild-logo.png');
+    const res = await fetch(`${import.meta.env.BASE_URL}hbuild-logo.png`);
     const blob = await res.blob();
     logoDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -195,5 +195,7 @@ export async function generateLumberTakeoffPDF(state: EstimateState, breakdown: 
   doc.text('HBUILD | 303-356-1262 | Colorado', pageWidth / 2, pageH - 8, { align: 'center' });
 
   const filename = `LumberTakeoff_${state.jobDetails.customerName?.replace(/\s+/g, '_') || 'Job'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-  doc.save(filename);
+  const blob = doc.output('blob');
+  if (options.download !== false) doc.save(filename);
+  return { filename, blob };
 }

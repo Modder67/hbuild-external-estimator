@@ -35,7 +35,7 @@ function cellStyle(
   numFmt = '',
   italic = false,
   wrapText = false,
-): XLSX.CellStyle {
+): { font?: Record<string, unknown>; [key: string]: unknown } {
   return {
     fill: { fgColor: { rgb: bgArgb }, patternType: 'solid' },
     font: { color: { rgb: fgArgb }, bold, italic, sz: size, name: 'Calibri' },
@@ -47,14 +47,14 @@ function cellStyle(
       right:  { style: 'thin', color: { rgb: 'FF333333' } },
     },
     numFmt,
-  } as XLSX.CellStyle;
+  };
 }
 
 function setCell(
   ws: XLSX.WorkSheet,
   addr: string,
   value: string | number | null,
-  style: XLSX.CellStyle,
+  style: Record<string, unknown>,
   type: 'n' | 's' | 'f' = value !== null && typeof value === 'number' ? 'n' : 's',
 ) {
   ws[addr] = { v: value ?? '', t: type, s: style };
@@ -70,7 +70,7 @@ function buildEstimateSheet(state: EstimateState, pricing: PricingBreakdown): XL
   const ref: string[] = [];
   let row = 1;
 
-  const set = (col: string, val: string | number | null, style: XLSX.CellStyle) => {
+  const set = (col: string, val: string | number | null, style: Record<string, unknown>) => {
     setCell(ws, `${col}${row}`, val, style);
   };
 

@@ -38,6 +38,8 @@ export interface StairPosts {
 }
 
 export interface EstimateState {
+  projectId?: string;
+  projectName?: string;
   jobDetails: {
     salesperson: string;
     customerName: string;

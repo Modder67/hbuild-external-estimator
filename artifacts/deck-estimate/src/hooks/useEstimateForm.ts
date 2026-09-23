@@ -70,6 +70,26 @@ export function useEstimateForm() {
     }));
   };
 
+  const selectProject = (project: { id: string; name: string } | null) => {
+    setState(prev => {
+      if (prev.projectId === project?.id) return prev;
+      // A changed project starts a new estimate, including clearing manually
+      // entered client data. Keep only staff-controlled salesperson and date.
+      return {
+        ...defaultState,
+        projectId: project?.id,
+        projectName: project?.name,
+        jobDetails: {
+          ...defaultState.jobDetails,
+          salesperson: prev.jobDetails.salesperson,
+          date: prev.jobDetails.date,
+          customerName: '',
+          customerAddress: '',
+        },
+      };
+    });
+  };
+
   const updateMeasurement = (type: MeasurementType, index: number, value: string) => {
     setState(prev => {
       const newArr = [...prev.measurements[type]];
@@ -149,6 +169,7 @@ export function useEstimateForm() {
   return {
     state,
     updateJobDetails,
+    selectProject,
     updateMeasurement,
     addMeasurementSegment,
     removeMeasurementSegment,

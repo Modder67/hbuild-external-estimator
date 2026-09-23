@@ -24,3 +24,16 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+HBUILD_ORG_ID = "b84f9af3-5701-4407-9920-782ab77e907b"
+PLATFORM_GATEWAY_URL = "https://hledger.netlify.app/api/gateway"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_o8vRo4RlZGF3phj2eWNIMQ_apL3u7Jw"
+SUPABASE_URL = "https://hiseqnrxuldhfuhqklkh.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_o8vRo4RlZGF3phj2eWNIMQ_apL3u7Jw"
+VITE_SUPABASE_URL = "https://hiseqnrxuldhfuhqklkh.supabase.co"

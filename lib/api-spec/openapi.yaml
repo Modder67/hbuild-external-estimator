@@ -10,7 +10,36 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: mesh
+    description: Authorized HBUILD mesh reads
 paths:
+  /mesh/projects:
+    get:
+      operationId: listMeshProjects
+      tags: [mesh]
+      summary: List canonical planner projects through the mesh gateway
+      security:
+        - userAccessToken: []
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [projects]
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MeshProject"
+        "401":
+          description: Missing or invalid user session
+        "403":
+          description: Membership or app grant denied
+        "503":
+          description: Mesh not configured or unavailable
   /healthz:
     get:
       operationId: healthCheck
@@ -25,7 +54,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 components:
+  securitySchemes:
+    userAccessToken:
+      type: http
+      scheme: bearer
   schemas:
+    MeshProject:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, color, sort]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        color: { type: string }
+        sort: { type: integer }
     HealthStatus:
       type: object
       properties:

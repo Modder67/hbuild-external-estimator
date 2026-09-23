@@ -30,11 +30,12 @@ function sectionTitle(
 export async function generateEstimatePDF(
   state: EstimateState,
   breakdown: PricingBreakdown,
+  options: { download?: boolean } = {},
 ) {
   // Fetch logo
   let logoDataUrl: string | null = null;
   try {
-    const res  = await fetch('/hbuild-logo.png');
+    const res  = await fetch(`${import.meta.env.BASE_URL}hbuild-logo.png`);
     const blob = await res.blob();
     logoDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -320,5 +321,7 @@ export async function generateEstimatePDF(
   // ── SAVE ─────────────────────────────────────────────────────────────────
   const filename =
     `Estimate_${(state.jobDetails.customerName || 'Deck').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-  doc.save(filename);
+  const blob = doc.output('blob');
+  if (options.download !== false) doc.save(filename);
+  return { filename, blob };
 }

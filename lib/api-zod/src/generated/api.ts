@@ -8,6 +8,21 @@
 import * as zod from "zod";
 
 /**
+ * @summary List canonical planner projects through the mesh gateway
+ */
+export const ListMeshProjectsResponse = zod.object({
+  projects: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      slug: zod.string(),
+      color: zod.string(),
+      sort: zod.number(),
+    }),
+  ),
+});
+
+/**
  * Returns server health status
  * @summary Health check
  */

@@ -11,6 +11,7 @@ import { generateEstimatePDF } from '@/lib/pdfExport';
 import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { generateExcelExport } from '@/lib/excelExport';
 import { useToast } from '@/hooks/use-toast';
+import { MeshProjectPicker } from '@/components/MeshProjectPicker';
 
 // --- UI Components ---
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -24,6 +25,7 @@ export default function EstimateBuilder() {
   const { 
     state, 
     updateJobDetails, 
+    selectProject,
     updateMeasurement, 
     addMeasurementSegment, 
     removeMeasurementSegment,
@@ -106,6 +108,7 @@ export default function EstimateBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+            <MeshProjectPicker projectId={state.projectId} projectName={state.projectName} onSelect={selectProject} />
             <div className="space-y-2">
               <Label>Salesperson</Label>
               <Input 
@@ -150,6 +153,9 @@ export default function EstimateBuilder() {
                 placeholder="e.g., Full Deck Remodel with Custom Railing"
                 className="bg-background/50 border-muted"
               />
+            </div>
+            <div className="md:col-span-2 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+              Hdocs save is not available yet: its file upload action and verified client/job-code lookup are not implemented in the mesh. PDF and Excel downloads below still work.
             </div>
           </CardContent>
         </Card>

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+
 export interface MeshProject {
   id: string;
   name: string;
@@ -12,11 +13,3 @@ export interface MeshProject {
   color: string;
   sort: number;
 }
-
-export interface HealthStatus {
-  status: string;
-}
-
-export type ListMeshProjects200 = {
-  projects: MeshProject[];
-};

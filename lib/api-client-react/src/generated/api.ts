@@ -13,7 +13,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type { HealthStatus, ListMeshProjects200 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -23,6 +23,81 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary List canonical planner projects through the mesh gateway
+ */
+export const getListMeshProjectsUrl = () => {
+  return `/api/mesh/projects`;
+};
+
+export const listMeshProjects = async (
+  options?: RequestInit,
+): Promise<ListMeshProjects200> => {
+  return customFetch<ListMeshProjects200>(getListMeshProjectsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMeshProjectsQueryKey = () => {
+  return [`/api/mesh/projects`] as const;
+};
+
+export const getListMeshProjectsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMeshProjects>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMeshProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMeshProjectsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMeshProjects>>
+  > = ({ signal }) => listMeshProjects({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMeshProjects>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMeshProjectsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMeshProjects>>
+>;
+export type ListMeshProjectsQueryError = ErrorType<void>;
+
+/**
+ * @summary List canonical planner projects through the mesh gateway
+ */
+
+export function useListMeshProjects<
+  TData = Awaited<ReturnType<typeof listMeshProjects>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMeshProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMeshProjectsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * Returns server health status
