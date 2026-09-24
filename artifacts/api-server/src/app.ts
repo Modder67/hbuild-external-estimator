@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import intakeRouter from "./routes/intake";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -26,6 +27,8 @@ app.use(
   }),
 );
 app.use(cors());
+// Intake PDFs are base64 in JSON; keep the higher limit confined to this route.
+app.use("/api/intake", express.json({ limit: "12mb" }), intakeRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

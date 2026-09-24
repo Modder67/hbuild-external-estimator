@@ -38,10 +38,20 @@ export interface StairPosts {
 }
 
 export interface EstimateState {
+  sourceId?: string;
+  clientSourceId?: string;
   projectId?: string;
   projectName?: string;
   jobDetails: {
     salesperson: string;
+    firstName: string;
+    lastName: string;
+    jobCode: string;
+    addressLine1: string;
+    addressLine2: string;
+    city: string;
+    region: string;
+    postalCode: string;
     customerName: string;
     customerAddress: string;
     jobTitle: string;

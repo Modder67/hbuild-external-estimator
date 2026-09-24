@@ -8,6 +8,81 @@
 import * as zod from "zod";
 
 /**
+ * @summary Check whether the server-side Ledger intake is provisioned
+ */
+export const GetIntakeStatusResponse = zod.object({
+  configured: zod.boolean(),
+});
+
+/**
+ * @summary Deliver a new-job identity snapshot to H Ledger
+ */
+
+export const DeliverIntakeProjectBody = zod.object({
+  sourceId: zod.string().uuid(),
+  clientSourceId: zod.string().uuid(),
+  deliveryId: zod.string().uuid(),
+  source: zod.object({
+    updatedAt: zod
+      .string()
+      .describe("ISO instant with explicit timezone offset"),
+    revision: zod.string().optional(),
+  }),
+  client: zod.object({
+    firstName: zod.string().min(1),
+    lastName: zod.string().min(1),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    address: zod
+      .object({
+        line1: zod.string().optional(),
+        line2: zod.string().optional(),
+        city: zod.string().optional(),
+        state: zod.string().optional(),
+        postalCode: zod.string().optional(),
+      })
+      .optional(),
+  }),
+  project: zod.object({
+    projectType: zod.string(),
+    name: zod.string(),
+    jobCode: zod.string().optional(),
+  }),
+  expectedDocuments: zod.array(zod.enum(["proposal", "takeoff"])).optional(),
+});
+
+export const DeliverIntakeProjectResponse = zod.object({
+  outcome: zod.enum(["applied", "stale"]),
+  detail: zod.string().optional(),
+});
+
+/**
+ * @summary Deliver one project-bound PDF to H Ledger
+ */
+export const DeliverIntakeDocumentBody = zod.object({
+  sourceId: zod.string().uuid(),
+  deliveryId: zod.string().uuid(),
+  source: zod.object({
+    updatedAt: zod
+      .string()
+      .describe("ISO instant with explicit timezone offset"),
+    revision: zod.string().optional(),
+  }),
+  document: zod.object({
+    type: zod.enum(["proposal", "takeoff"]),
+    originalName: zod.string(),
+    mime: zod.enum(["application/pdf"]),
+    sha256: zod.string(),
+    contentBase64: zod.string(),
+  }),
+});
+
+export const DeliverIntakeDocumentResponse = zod.object({
+  outcome: zod.enum(["applied", "stale"]),
+  detail: zod.string().optional(),
+});
+
+/**
  * @summary Check whether server-side mesh access is configured
  */
 export const GetMeshStatusResponse = zod.object({

@@ -5,6 +5,101 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface IntakeStatus {
+  configured: boolean;
+}
+
+export type IntakeReceiptOutcome =
+  (typeof IntakeReceiptOutcome)[keyof typeof IntakeReceiptOutcome];
+
+export const IntakeReceiptOutcome = {
+  applied: "applied",
+  stale: "stale",
+} as const;
+
+export interface IntakeReceipt {
+  outcome: IntakeReceiptOutcome;
+  detail?: string;
+}
+
+export interface IntakeSource {
+  /** ISO instant with explicit timezone offset */
+  updatedAt: string;
+  revision?: string;
+}
+
+export type EstimatorProjectDeliveryClientAddress = {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+};
+
+export type EstimatorProjectDeliveryClient = {
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
+  phone?: string;
+  email?: string;
+  address?: EstimatorProjectDeliveryClientAddress;
+};
+
+export type EstimatorProjectDeliveryProject = {
+  projectType: string;
+  name: string;
+  jobCode?: string;
+};
+
+export type EstimatorProjectDeliveryExpectedDocumentsItem =
+  (typeof EstimatorProjectDeliveryExpectedDocumentsItem)[keyof typeof EstimatorProjectDeliveryExpectedDocumentsItem];
+
+export const EstimatorProjectDeliveryExpectedDocumentsItem = {
+  proposal: "proposal",
+  takeoff: "takeoff",
+} as const;
+
+export interface EstimatorProjectDelivery {
+  sourceId: string;
+  clientSourceId: string;
+  deliveryId: string;
+  source: IntakeSource;
+  client: EstimatorProjectDeliveryClient;
+  project: EstimatorProjectDeliveryProject;
+  expectedDocuments?: EstimatorProjectDeliveryExpectedDocumentsItem[];
+}
+
+export type EstimatorDocumentDeliveryDocumentType =
+  (typeof EstimatorDocumentDeliveryDocumentType)[keyof typeof EstimatorDocumentDeliveryDocumentType];
+
+export const EstimatorDocumentDeliveryDocumentType = {
+  proposal: "proposal",
+  takeoff: "takeoff",
+} as const;
+
+export type EstimatorDocumentDeliveryDocumentMime =
+  (typeof EstimatorDocumentDeliveryDocumentMime)[keyof typeof EstimatorDocumentDeliveryDocumentMime];
+
+export const EstimatorDocumentDeliveryDocumentMime = {
+  "application/pdf": "application/pdf",
+} as const;
+
+export type EstimatorDocumentDeliveryDocument = {
+  type: EstimatorDocumentDeliveryDocumentType;
+  originalName: string;
+  mime: EstimatorDocumentDeliveryDocumentMime;
+  sha256: string;
+  contentBase64: string;
+};
+
+export interface EstimatorDocumentDelivery {
+  sourceId: string;
+  deliveryId: string;
+  source: IntakeSource;
+  document: EstimatorDocumentDeliveryDocument;
+}
+
 export interface MeshProject {
   id: string;
   name: string;

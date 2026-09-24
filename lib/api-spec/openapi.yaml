@@ -12,7 +12,71 @@ tags:
     description: Health operations
   - name: mesh
     description: Authorized HBUILD mesh reads
+  - name: intake
+    description: Signed H Ledger estimator intake
 paths:
+  /intake/status:
+    get:
+      operationId: getIntakeStatus
+      tags: [intake]
+      summary: Check whether the server-side Ledger intake is provisioned
+      responses:
+        "200":
+          description: Configuration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeStatus"
+  /intake/projects:
+    post:
+      operationId: deliverIntakeProject
+      tags: [intake]
+      security:
+        - userAccessToken: []
+      summary: Deliver a new-job identity snapshot to H Ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EstimatorProjectDelivery"
+      responses:
+        "200":
+          description: Ledger receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReceipt"
+        "400": { description: Invalid source snapshot }
+        "401": { description: Sign-in required }
+        "403": { description: Missing mesh permission }
+        "409": { description: Intake conflict or review needed }
+        "503": { description: Ledger intake unavailable }
+  /intake/documents:
+    post:
+      operationId: deliverIntakeDocument
+      tags: [intake]
+      security:
+        - userAccessToken: []
+      summary: Deliver one project-bound PDF to H Ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EstimatorDocumentDelivery"
+      responses:
+        "200":
+          description: Ledger receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReceipt"
+        "400": { description: Invalid PDF or source snapshot }
+        "401": { description: Sign-in required }
+        "403": { description: Missing mesh permission }
+        "409": { description: Intake conflict or review needed }
+        "503": { description: Ledger intake unavailable }
   /mesh/status:
     get:
       operationId: getMeshStatus
@@ -104,6 +168,73 @@ components:
       type: http
       scheme: bearer
   schemas:
+    IntakeStatus:
+      type: object
+      required: [configured]
+      properties:
+        configured: { type: boolean }
+    IntakeReceipt:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { type: string, enum: [applied, stale] }
+        detail: { type: string }
+    IntakeSource:
+      type: object
+      required: [updatedAt]
+      properties:
+        updatedAt: { type: string, description: ISO instant with explicit timezone offset }
+        revision: { type: string }
+    EstimatorProjectDelivery:
+      type: object
+      required: [sourceId, clientSourceId, deliveryId, source, client, project]
+      properties:
+        sourceId: { type: string, format: uuid }
+        clientSourceId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        source: { $ref: "#/components/schemas/IntakeSource" }
+        client:
+          type: object
+          required: [firstName, lastName]
+          properties:
+            firstName: { type: string, minLength: 1 }
+            lastName: { type: string, minLength: 1 }
+            phone: { type: string }
+            email: { type: string }
+            address:
+              type: object
+              properties:
+                line1: { type: string }
+                line2: { type: string }
+                city: { type: string }
+                state: { type: string }
+                postalCode: { type: string }
+        project:
+          type: object
+          required: [projectType, name]
+          properties:
+            projectType: { type: string }
+            name: { type: string }
+            jobCode: { type: string }
+        expectedDocuments:
+          type: array
+          items: { type: string, enum: [proposal, takeoff] }
+    EstimatorDocumentDelivery:
+      type: object
+      required: [sourceId, deliveryId, source, document]
+      properties:
+        sourceId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        source: { $ref: "#/components/schemas/IntakeSource" }
+        document:
+          type: object
+          required: [type, originalName, mime, sha256, contentBase64]
+          properties:
+            type: { type: string, enum: [proposal, takeoff] }
+            originalName: { type: string }
+            mime: { type: string, enum: [application/pdf] }
+            sha256: { type: string }
+            contentBase64: { type: string }
     MeshProject:
       type: object
       additionalProperties: false

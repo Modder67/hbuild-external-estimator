@@ -11,7 +11,7 @@ import { generateEstimatePDF } from '@/lib/pdfExport';
 import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { generateExcelExport } from '@/lib/excelExport';
 import { useToast } from '@/hooks/use-toast';
-import { MeshProjectPicker, type ProjectDetails } from '@/components/MeshProjectPicker';
+import { LedgerIntakePanel } from '@/components/LedgerIntakePanel';
 
 // --- UI Components ---
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -25,8 +25,7 @@ export default function EstimateBuilder() {
   const { 
     state, 
     updateJobDetails, 
-    selectProject,
-    applyProjectDetails,
+    setClientSourceId,
     updateMeasurement, 
     addMeasurementSegment, 
     removeMeasurementSegment,
@@ -40,7 +39,6 @@ export default function EstimateBuilder() {
   } = useEstimateForm();
   
   const { toast } = useToast();
-  const [verifiedDetails, setVerifiedDetails] = useState<ProjectDetails | null>(null);
 
   const pricing = useMemo(() => calculatePricing(state), [state]);
 
@@ -110,13 +108,7 @@ export default function EstimateBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
-            <MeshProjectPicker projectId={state.projectId} projectName={state.projectName}
-              onSelect={project => { setVerifiedDetails(null); selectProject(project); }}
-              onDetails={(projectId, details) => {
-                if (projectId !== state.projectId) return;
-                setVerifiedDetails(details);
-                if (details) applyProjectDetails(projectId, details.customerName, details.customerAddress);
-              }} />
+            <LedgerIntakePanel state={state} pricing={pricing} onClientSourceIdChange={setClientSourceId} />
             <div className="space-y-2">
               <Label>Salesperson</Label>
               <Input 
@@ -136,39 +128,61 @@ export default function EstimateBuilder() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Customer Name {verifiedDetails && verifiedDetails.projectId === state.projectId &&
-                verifiedDetails.customerName === state.jobDetails.customerName &&
-                <span className="text-xs text-muted-foreground">({verifiedDetails.clientSource === 'ledger' ? 'H Ledger' : 'H Draft link'})</span>}</Label>
+              <Label>Client First Name</Label>
               <Input 
-                value={state.jobDetails.customerName}
-                onChange={(e) => { setVerifiedDetails(null); updateJobDetails('customerName', e.target.value); }}
-                placeholder="John & Jane Doe"
+                value={state.jobDetails.firstName}
+                onChange={(e) => updateJobDetails('firstName', e.target.value)}
+                placeholder="John"
                 className="bg-background/50 border-muted"
               />
             </div>
             <div className="space-y-2">
-              <Label>Customer Address {verifiedDetails && verifiedDetails.projectId === state.projectId &&
-                verifiedDetails.clientSource === 'ledger' &&
-                verifiedDetails.customerAddress === state.jobDetails.customerAddress &&
-                <span className="text-xs text-muted-foreground">(H Ledger)</span>}</Label>
+              <Label>Client Last Name</Label>
               <Input 
-                value={state.jobDetails.customerAddress}
-                onChange={(e) => { setVerifiedDetails(null); updateJobDetails('customerAddress', e.target.value); }}
-                placeholder="123 Main St, Littleton CO"
+                value={state.jobDetails.lastName}
+                onChange={(e) => updateJobDetails('lastName', e.target.value)}
+                placeholder="Doe"
                 className="bg-background/50 border-muted"
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>Job Title</Label>
+              <Label>Job Code (optional)</Label>
+              <Input value={state.jobDetails.jobCode} onChange={e => updateJobDetails('jobCode', e.target.value)}
+                placeholder="DRP-001" maxLength={20} className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Client Address Line 1 (optional)</Label>
+              <Input value={state.jobDetails.addressLine1} onChange={e => updateJobDetails('addressLine1', e.target.value)}
+                placeholder="123 Main St" className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Client Address Line 2 (optional)</Label>
+              <Input value={state.jobDetails.addressLine2} onChange={e => updateJobDetails('addressLine2', e.target.value)}
+                placeholder="Unit 2" className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2">
+              <Label>City</Label>
+              <Input value={state.jobDetails.city} onChange={e => updateJobDetails('city', e.target.value)}
+                placeholder="Littleton" className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2">
+              <Label>State</Label>
+              <Input value={state.jobDetails.region} onChange={e => updateJobDetails('region', e.target.value)}
+                placeholder="CO" className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Postal Code</Label>
+              <Input value={state.jobDetails.postalCode} onChange={e => updateJobDetails('postalCode', e.target.value)}
+                placeholder="80120" className="bg-background/50 border-muted" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Project Name</Label>
               <Input 
                 value={state.jobDetails.jobTitle}
                 onChange={(e) => updateJobDetails('jobTitle', e.target.value)}
                 placeholder="e.g., Full Deck Remodel with Custom Railing"
                 className="bg-background/50 border-muted"
               />
-            </div>
-            <div className="md:col-span-2 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-              Hdocs save is not available yet: its private bucket and file upload worker have not been deployed. PDF and Excel downloads below still work.
             </div>
           </CardContent>
         </Card>

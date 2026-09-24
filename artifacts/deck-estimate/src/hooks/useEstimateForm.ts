@@ -5,8 +5,18 @@ import { format } from 'date-fns';
 const STORAGE_KEY = 'deck_remodel_pros_estimate_state';
 
 const defaultState: EstimateState = {
+  sourceId: crypto.randomUUID(),
+  clientSourceId: crypto.randomUUID(),
   jobDetails: {
     salesperson: '',
+    firstName: '',
+    lastName: '',
+    jobCode: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    region: '',
+    postalCode: '',
     customerName: '',
     customerAddress: '',
     jobTitle: 'Full Deck Remodel',
@@ -44,6 +54,9 @@ export function useEstimateForm() {
         return {
           ...defaultState,
           ...parsed,
+          sourceId: typeof parsed.sourceId === 'string' ? parsed.sourceId : crypto.randomUUID(),
+          clientSourceId: typeof parsed.clientSourceId === 'string' ? parsed.clientSourceId : crypto.randomUUID(),
+          jobDetails: { ...defaultState.jobDetails, ...(parsed.jobDetails || {}) },
           measurements: { ...defaultState.measurements, ...(parsed.measurements || {}) },
           stairPosts: { ...defaultState.stairPosts, ...(parsed.stairPosts || {}) },
           lumberSelections: { ...defaultState.lumberSelections, ...(parsed.lumberSelections || {}) },
@@ -64,45 +77,22 @@ export function useEstimateForm() {
   }, [state]);
 
   const updateJobDetails = (field: keyof EstimateState['jobDetails'], value: string) => {
-    setState(prev => ({
-      ...prev,
-      jobDetails: { ...prev.jobDetails, [field]: value }
-    }));
-  };
-
-  const selectProject = (project: { id: string; name: string } | null) => {
     setState(prev => {
-      if (prev.projectId === project?.id) return prev;
-      // A changed project starts a new estimate, including clearing manually
-      // entered client data. Keep only staff-controlled salesperson and date.
-      return {
-        ...defaultState,
-        projectId: project?.id,
-        projectName: project?.name,
-        jobDetails: {
-          ...defaultState.jobDetails,
-          salesperson: prev.jobDetails.salesperson,
-          date: prev.jobDetails.date,
-          customerName: '',
-          customerAddress: '',
-        },
-      };
-    });
-  };
-
-  const applyProjectDetails = (projectId: string, customerName: string | null, customerAddress: string | null) => {
-    setState(prev => {
-      // A late response from a previous selection must never overwrite this job.
-      if (prev.projectId !== projectId) return prev;
+      const next = { ...prev.jobDetails, [field]: value };
+      if (field === 'firstName' || field === 'lastName')
+        next.customerName = [next.firstName, next.lastName].filter(Boolean).join(' ');
+      if (['addressLine1', 'addressLine2', 'city', 'region', 'postalCode'].includes(field))
+        next.customerAddress = [next.addressLine1, next.addressLine2,
+          [next.city, next.region, next.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
       return {
         ...prev,
-        jobDetails: {
-          ...prev.jobDetails,
-          customerName: customerName ?? prev.jobDetails.customerName,
-          customerAddress: customerAddress ?? prev.jobDetails.customerAddress,
-        },
+        jobDetails: next,
       };
     });
+  };
+
+  const setClientSourceId = (id: string) => {
+    setState(prev => ({ ...prev, clientSourceId: id }));
   };
 
   const updateMeasurement = (type: MeasurementType, index: number, value: string) => {
@@ -173,6 +163,8 @@ export function useEstimateForm() {
     if (window.confirm("Are you sure you want to clear the entire form? This cannot be undone.")) {
       setState({
         ...defaultState,
+        sourceId: crypto.randomUUID(),
+        clientSourceId: crypto.randomUUID(),
         jobDetails: {
           ...defaultState.jobDetails,
           salesperson: state.jobDetails.salesperson
@@ -184,8 +176,7 @@ export function useEstimateForm() {
   return {
     state,
     updateJobDetails,
-    selectProject,
-    applyProjectDetails,
+    setClientSourceId,
     updateMeasurement,
     addMeasurementSegment,
     removeMeasurementSegment,

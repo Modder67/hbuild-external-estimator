@@ -5,7 +5,7 @@ import { ListMeshProjectsResponse, GetMeshProjectDetailsResponse, DraftHookProje
 const router: IRouter = Router();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function gatewayConfig() {
+export function gatewayConfig() {
   const gatewayUrl = process.env.PLATFORM_GATEWAY_URL?.trim();
   const credential = process.env.PLATFORM_APP_CREDENTIAL?.trim();
   const orgId = process.env.HBUILD_ORG_ID?.trim();
@@ -16,7 +16,7 @@ function gatewayConfig() {
   return { gatewayUrl, credential, orgId: orgId!, supabaseUrl, publicKey };
 }
 
-async function verifiedUser(req: Request, config: NonNullable<ReturnType<typeof gatewayConfig>>) {
+export async function verifiedUser(req: Request, config: NonNullable<ReturnType<typeof gatewayConfig>>) {
   const match = /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "");
   if (!match) return null;
   const auth = await fetch(`${config.supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
@@ -28,7 +28,7 @@ async function verifiedUser(req: Request, config: NonNullable<ReturnType<typeof 
   return typeof user.id === "string" && uuid.test(user.id) ? user.id : null;
 }
 
-async function allowedProjects(config: NonNullable<ReturnType<typeof gatewayConfig>>, userId: string) {
+export async function allowedProjects(config: NonNullable<ReturnType<typeof gatewayConfig>>, userId: string) {
   const result = await fetch(config.gatewayUrl, {
     method: "POST",
     headers: {

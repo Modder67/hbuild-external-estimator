@@ -5,29 +5,285 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
+  EstimatorDocumentDelivery,
+  EstimatorProjectDelivery,
   GetMeshStatus200,
   HealthStatus,
+  IntakeReceipt,
+  IntakeStatus,
   ListMeshProjects200,
   MeshProjectDetails,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Check whether the server-side Ledger intake is provisioned
+ */
+export const getGetIntakeStatusUrl = () => {
+  return `/api/intake/status`;
+};
+
+export const getIntakeStatus = async (
+  options?: RequestInit,
+): Promise<IntakeStatus> => {
+  return customFetch<IntakeStatus>(getGetIntakeStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetIntakeStatusQueryKey = () => {
+  return [`/api/intake/status`] as const;
+};
+
+export const getGetIntakeStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getIntakeStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIntakeStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetIntakeStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntakeStatus>>> = ({
+    signal,
+  }) => getIntakeStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getIntakeStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetIntakeStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getIntakeStatus>>
+>;
+export type GetIntakeStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check whether the server-side Ledger intake is provisioned
+ */
+
+export function useGetIntakeStatus<
+  TData = Awaited<ReturnType<typeof getIntakeStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIntakeStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetIntakeStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Deliver a new-job identity snapshot to H Ledger
+ */
+export const getDeliverIntakeProjectUrl = () => {
+  return `/api/intake/projects`;
+};
+
+export const deliverIntakeProject = async (
+  estimatorProjectDelivery: EstimatorProjectDelivery,
+  options?: RequestInit,
+): Promise<IntakeReceipt> => {
+  return customFetch<IntakeReceipt>(getDeliverIntakeProjectUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimatorProjectDelivery),
+  });
+};
+
+export const getDeliverIntakeProjectMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deliverIntakeProject>>,
+    TError,
+    { data: BodyType<EstimatorProjectDelivery> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deliverIntakeProject>>,
+  TError,
+  { data: BodyType<EstimatorProjectDelivery> },
+  TContext
+> => {
+  const mutationKey = ["deliverIntakeProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deliverIntakeProject>>,
+    { data: BodyType<EstimatorProjectDelivery> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return deliverIntakeProject(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeliverIntakeProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deliverIntakeProject>>
+>;
+export type DeliverIntakeProjectMutationBody =
+  BodyType<EstimatorProjectDelivery>;
+export type DeliverIntakeProjectMutationError = ErrorType<void>;
+
+/**
+ * @summary Deliver a new-job identity snapshot to H Ledger
+ */
+export const useDeliverIntakeProject = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deliverIntakeProject>>,
+    TError,
+    { data: BodyType<EstimatorProjectDelivery> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deliverIntakeProject>>,
+  TError,
+  { data: BodyType<EstimatorProjectDelivery> },
+  TContext
+> => {
+  return useMutation(getDeliverIntakeProjectMutationOptions(options));
+};
+
+/**
+ * @summary Deliver one project-bound PDF to H Ledger
+ */
+export const getDeliverIntakeDocumentUrl = () => {
+  return `/api/intake/documents`;
+};
+
+export const deliverIntakeDocument = async (
+  estimatorDocumentDelivery: EstimatorDocumentDelivery,
+  options?: RequestInit,
+): Promise<IntakeReceipt> => {
+  return customFetch<IntakeReceipt>(getDeliverIntakeDocumentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimatorDocumentDelivery),
+  });
+};
+
+export const getDeliverIntakeDocumentMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deliverIntakeDocument>>,
+    TError,
+    { data: BodyType<EstimatorDocumentDelivery> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deliverIntakeDocument>>,
+  TError,
+  { data: BodyType<EstimatorDocumentDelivery> },
+  TContext
+> => {
+  const mutationKey = ["deliverIntakeDocument"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deliverIntakeDocument>>,
+    { data: BodyType<EstimatorDocumentDelivery> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return deliverIntakeDocument(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeliverIntakeDocumentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deliverIntakeDocument>>
+>;
+export type DeliverIntakeDocumentMutationBody =
+  BodyType<EstimatorDocumentDelivery>;
+export type DeliverIntakeDocumentMutationError = ErrorType<void>;
+
+/**
+ * @summary Deliver one project-bound PDF to H Ledger
+ */
+export const useDeliverIntakeDocument = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deliverIntakeDocument>>,
+    TError,
+    { data: BodyType<EstimatorDocumentDelivery> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deliverIntakeDocument>>,
+  TError,
+  { data: BodyType<EstimatorDocumentDelivery> },
+  TContext
+> => {
+  return useMutation(getDeliverIntakeDocumentMutationOptions(options));
+};
 
 /**
  * @summary Check whether server-side mesh access is configured

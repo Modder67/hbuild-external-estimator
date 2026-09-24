@@ -1,1 +1,2 @@
 - [Hdocs file storage](hdocs-storage-decision.md) — owner chose private Supabase Storage for PDFs; preserve Hdocs ownership and worker-mediated access.
+- [Estimator intake authority](estimator-intake-authority.md) — new jobs originate in this estimator and enter HBUILD through Ledger, not a picker of existing projects.
