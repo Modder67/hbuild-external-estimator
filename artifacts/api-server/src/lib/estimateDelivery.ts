@@ -123,3 +123,59 @@ export function takeoffRows(calculation: Calculation) {
   return ["Materials takeoff", ...calculation.takeoff.map(item =>
     `${item.label}: ${item.quantity} ${item.unit}`)];
 }
+
+function deckHeader(project: Record<string, unknown>, revision: number, issuedAt?: string) {
+  const scope = project.scope as Record<string, any>;
+  const job = scope.jobDetails as Record<string, unknown>;
+  const name = typeof project.projectName === "string" && project.projectName.trim()
+    ? project.projectName.trim()
+    : typeof job.jobTitle === "string" && job.jobTitle.trim() ? job.jobTitle.trim() : "Deck estimate";
+  const client = [project.firstName, project.lastName].filter(value => typeof value === "string" && value.trim()).join(" ");
+  const date = typeof job.date === "string" && job.date.trim() ? job.date : "Not specified";
+  return [`Project: ${name}`, `Client: ${client || "Not specified"}`, `Estimate date: ${date}`, `Issued at (UTC): ${issuedAt ?? "Not specified"}`, `Revision: ${revision}`, ""];
+}
+
+export function deckProposalRows(
+  project: Record<string, unknown>,
+  calculation: Calculation,
+  total: number,
+  revision: number,
+  issuedAt?: string,
+) {
+  const scope = project.scope as Record<string, any>;
+  const markupRates = { good: 52, better: 42, best: 37 };
+  const markup = scope.selectedMarkup as keyof typeof markupRates;
+  const materialTier = typeof scope.materialTier === "string" ? scope.materialTier : "unspecified";
+  const directSubtotal = calculation.lines.reduce((sum, line) => sum + line.totalCents, 0);
+  const markupAmount = total - directSubtotal;
+  return [
+    ...deckHeader(project, revision, issuedAt),
+    `Material tier: ${materialTier}`,
+    `Selected markup: ${markup} (${markupRates[markup]}%) on pre-tax subtotal`,
+    "",
+    "Quantity | Unit | Unit amount | Line amount",
+    ...calculation.lines.map(line =>
+      `${line.label}: ${line.quantity} ${line.unit} | $${(line.unitCostCents / 100).toFixed(2)} / ${line.unit} | $${(line.totalCents / 100).toFixed(2)}`),
+    "",
+    `Direct subtotal: $${(directSubtotal / 100).toFixed(2)}`,
+    `Selected tier markup (${markupRates[markup]}%): $${(markupAmount / 100).toFixed(2)}`,
+    `Before-tax total: $${(total / 100).toFixed(2)}`,
+    "Tax: Not calculated",
+    "",
+    "Calculation assumptions",
+    ...calculation.assumptions.map(assumption => `- ${assumption}`),
+    "Not released to client",
+  ];
+}
+
+export function deckTakeoffRows(project: Record<string, unknown>, calculation: Calculation, revision: number, issuedAt?: string) {
+  return [
+    ...deckHeader(project, revision, issuedAt),
+    "Ordering quantities only — selected or calculated items; no nominal reference quantities.",
+    ...calculation.takeoff.filter(item => item.quantity > 0).map(item =>
+      `${item.label}: ${item.quantity} ${item.unit}`),
+    "",
+    "Calculation assumptions",
+    ...calculation.assumptions.map(assumption => `- ${assumption}`),
+  ];
+}

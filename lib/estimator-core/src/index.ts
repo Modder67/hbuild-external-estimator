@@ -9,12 +9,15 @@ export const rateBookVersion = RATE_BOOK_VERSION;
 import { calculateFlooring } from './flooring';
 import { calculateBathroom } from './bathroom';
 import { calculateBasement } from './basement';
+import { calculateDeck, deckTotals } from './deck';
 import type { Calculation } from './types';
+import { totals } from './types';
+export { calculateDeck, deckTotals, deckIssueReadiness, validateDeckScope, DECK_MEASUREMENT_TYPES } from './deck';
 
 /** Calculate a known estimator scope. Malformed or unknown input is rejected without returning partial charges. */
 export function calculateForSlug(slug: string, scope: unknown): Calculation {
   const rejected = (message: string): Calculation => ({ lines: [], takeoff: [], issues: [message], assumptions: [] });
-  if (slug !== 'flooring' && slug !== 'bathroom' && slug !== 'basement') return rejected('Unsupported estimator slug: ' + slug + '.');
+  if (slug !== 'flooring' && slug !== 'bathroom' && slug !== 'basement' && slug !== 'deck') return rejected('Unsupported estimator slug: ' + slug + '.');
   const active = new Set<object>();
   const isJsonValue = (value: unknown): boolean => {
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
@@ -39,6 +42,7 @@ export function calculateForSlug(slug: string, scope: unknown): Calculation {
   }
   if (!serializable) return rejected('Estimator scope is malformed or not JSON-serializable.');
   const record = scope as Record<string, unknown>;
+  if (slug === 'deck') return calculateDeck(scope);
   const requiredArrays: Record<string, string[]> = { flooring: ['rooms', 'doors', 'orders', 'extras'], bathroom: ['bathrooms'], basement: ['walls', 'soffits', 'electricalPoints'] };
   if (requiredArrays[slug].some(key => !Array.isArray(record[key]))) return rejected('Malformed ' + slug + ' scope: required collections are missing or invalid.');
   const hasFields = (value: unknown, fields: string[]) => value !== null
@@ -86,4 +90,11 @@ export function calculateForSlug(slug: string, scope: unknown): Calculation {
   } catch {
     return rejected('Malformed ' + slug + ' scope: calculation was rejected and no charges were returned.');
   }
+}
+
+/** Use the authoritative quote total policy for the estimator selected by slug. */
+export function totalsForSlug(slug: string, calculation: Calculation, scope: unknown) {
+  if (slug === 'deck') return deckTotals(calculation, scope);
+  if (slug === 'flooring' || slug === 'bathroom' || slug === 'basement') return totals(calculation);
+  throw new Error('Unsupported estimator slug: ' + slug + '.');
 }

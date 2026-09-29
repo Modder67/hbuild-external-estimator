@@ -59,6 +59,7 @@ export const EstimateDraftSlug = {
   flooring: "flooring",
   bathroom: "bathroom",
   basement: "basement",
+  deck: "deck",
 } as const;
 
 export interface EstimateDraft {
@@ -98,6 +99,7 @@ export const EstimateDraftInputSlug = {
   flooring: "flooring",
   bathroom: "bathroom",
   basement: "basement",
+  deck: "deck",
 } as const;
 
 export interface EstimateDraftInput {

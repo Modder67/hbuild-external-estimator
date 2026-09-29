@@ -18,16 +18,16 @@ import {
   calculateForSlug,
   POLICY,
   RATE_BOOK_VERSION,
-  totals as calculateTotals,
+  totalsForSlug,
   uniqueLines,
   type Calculation,
 } from "@workspace/estimator-core";
 import { allowedProjects, gatewayConfig, verifiedUser } from "./mesh";
-import { proposalRows, readPrivatePdf, renderPdf, savePrivatePdf, sha256, takeoffRows } from "../lib/estimateDelivery";
+import { deckProposalRows, deckTakeoffRows, proposalRows, readPrivatePdf, renderPdf, savePrivatePdf, sha256, takeoffRows } from "../lib/estimateDelivery";
 
 const router: IRouter = Router();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const slugs = new Set(["flooring", "bathroom", "basement"]);
+const slugs = new Set(["flooring", "bathroom", "basement", "deck"]);
 const MAX_PROJECT_BYTES = 96 * 1024;
 
 type Authorized = { userId: string; orgId: string };
@@ -110,10 +110,23 @@ function computed(slug: string, project: Record<string, unknown>) {
   const calculation = uniqueLines(calculateForSlug(slug, project.scope)) as Calculation;
   return {
     calculation,
-    totals: calculateTotals(calculation),
+    totals: totalsForSlug(slug, calculation, project.scope),
     policyVersion: POLICY.version,
     rateBookVersion: RATE_BOOK_VERSION,
   };
+}
+
+function estimateProjectError(slug: string, project: Record<string, unknown>): string | undefined {
+  if (!validateProject(project)) return "Provide a valid project snapshot.";
+  if (slug !== "deck") return undefined;
+  const scope = project.scope as Record<string, unknown>;
+  if (typeof scope.sourceId === "string" && scope.sourceId.toLowerCase() !== project.sourceId.toLowerCase()) {
+    return "Deck scope sourceId must match the project sourceId.";
+  }
+  if (typeof scope.clientSourceId === "string" && scope.clientSourceId.toLowerCase() !== project.clientSourceId.toLowerCase()) {
+    return "Deck scope clientSourceId must match the project clientSourceId.";
+  }
+  return calculateForSlug("deck", scope).issues[0];
 }
 
 function stableJson(value: unknown): string {
@@ -166,9 +179,11 @@ router.post("/estimates", async (req, res): Promise<void> => {
     const auth = await authorize(req);
     if ("error" in auth) { res.status(auth.status).json({ error: auth.error }); return; }
     const parsed = CreateEstimateBody.safeParse(req.body);
-    if (!parsed.success || !slugs.has(parsed.data.slug) || !validateProject(parsed.data.project)) {
+    if (!parsed.success || !slugs.has(parsed.data.slug)) {
       res.status(400).json({ error: "Provide a supported estimator slug and a valid project snapshot." }); return;
     }
+    const projectError = estimateProjectError(parsed.data.slug, parsed.data.project);
+    if (projectError) { res.status(400).json({ error: projectError }); return; }
     const computedEstimate = computed(parsed.data.slug, parsed.data.project);
     const now = new Date();
     const [row] = await db.insert(estimateDraftsTable).values({
@@ -209,8 +224,9 @@ router.put("/estimates/:id", async (req, res): Promise<void> => {
     }
     const current = await getDraft(param(req, "id") ?? "", auth);
     if (!current) { res.status(404).json({ error: "Estimate draft not found." }); return; }
-    if (!validateProject(parsed.data.project) || parsed.data.project.sourceId !== current.sourceId) {
-      res.status(400).json({ error: "Project source ID cannot change and both source identifiers must be valid." }); return;
+    const projectError = estimateProjectError(current.slug, parsed.data.project);
+    if (projectError || parsed.data.project.sourceId !== current.sourceId) {
+      res.status(400).json({ error: projectError ?? "Project source ID cannot change." }); return;
     }
     const computedEstimate = computed(current.slug, parsed.data.project);
     const [row] = await db.update(estimateDraftsTable).set({
@@ -254,6 +270,11 @@ router.post("/estimates/:id/issue", async (req, res): Promise<void> => {
           !issueProject.lastName.trim() || !issueProject.projectName.trim()) {
         return { failure: "identity" as const };
       }
+      if (locked.slug === "deck" && estimateProjectError(locked.slug, issueProject)) {
+        const scope = issueProject.scope as Record<string, unknown>;
+        if (typeof scope.projectId === "string" && scope.projectId.trim()) return { failure: "linked-project" as const };
+        return { failure: "identity" as const };
+      }
       const live = computed(locked.slug, locked.project);
       if (locked.policyVersion !== POLICY.version || locked.rateBookVersion !== RATE_BOOK_VERSION ||
           stableJson(live.calculation) !== stableJson(locked.calculation) ||
@@ -285,9 +306,13 @@ router.post("/estimates/:id/issue", async (req, res): Promise<void> => {
         postalCode: clean(project.postalCode),
       };
       if (Object.values(address).some(Boolean)) client.address = address;
-      const typeName = locked.slug === "flooring" ? "Flooring" : locked.slug === "bathroom" ? "Bathroom" : "Basement";
-      const proposalBytes = renderPdf(`${typeName} estimate`, proposalRows(project, calc, quoteTotals.beforeTaxCents));
-      const takeoffBytes = renderPdf(`${typeName} material takeoff`, takeoffRows(calc));
+      const typeName = locked.slug === "flooring" ? "Flooring" : locked.slug === "bathroom" ? "Bathroom" : locked.slug === "deck" ? "Deck" : "Basement";
+      const proposalLines = locked.slug === "deck"
+        ? deckProposalRows(project, calc, quoteTotals.beforeTaxCents, revision, source.updatedAt)
+        : proposalRows(project, calc, quoteTotals.beforeTaxCents);
+      const takeoffLines = locked.slug === "deck" ? deckTakeoffRows(project, calc, revision, source.updatedAt) : takeoffRows(calc);
+      const proposalBytes = renderPdf(`${typeName} estimate`, proposalLines);
+      const takeoffBytes = renderPdf(`${typeName} material takeoff`, takeoffLines);
       if (proposalBytes.length > 8 * 1024 * 1024 || takeoffBytes.length > 8 * 1024 * 1024) {
         return { failure: "oversized" as const };
       }
@@ -343,10 +368,11 @@ router.post("/estimates/:id/issue", async (req, res): Promise<void> => {
       return { quote };
     });
     if ("failure" in result) {
-      const status = result.failure === "incomplete" || result.failure === "oversized" || result.failure === "identity"
+      const status = result.failure === "incomplete" || result.failure === "oversized" || result.failure === "identity" || result.failure === "linked-project"
         ? 422 : result.failure === "stale" || result.failure === "conflict" ? 409 : 404;
       res.status(status).json({ error: result.failure === "incomplete"
         ? "Resolve calculation issues and enter a non-zero scope before issuing."
+        : result.failure === "linked-project" ? "Deck estimates linked to a canonical project cannot be issued as a new-job estimate."
         : result.failure === "identity" ? "Enter client first and last name and a project name before issuing."
         : result.failure === "oversized" ? "Generated PDF exceeds the 8 MiB delivery limit."
         : result.failure === "stale" ? "Draft calculation or estimator policy/rates are stale. Re-save and review the recalculated draft."

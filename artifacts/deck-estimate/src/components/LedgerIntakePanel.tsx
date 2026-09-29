@@ -192,7 +192,7 @@ export function LedgerIntakePanel({
         {session && <Button type="button" variant="ghost" size="sm" onClick={() => void auth?.auth.signOut()}>Sign out</Button>}
       </div>
       <p className="text-sm text-amber-400" role="status">
-        Deck import is not ready. The API accepts only the exact snapshot of a server-issued immutable quote revision, and Deck has no server-issued-revision flow. This remains true even if the intake status endpoint reports configured. This panel will not submit a legacy browser-generated identity or PDF.
+        Legacy browser-only records and their saved PDFs remain available here for readback/recovery. They are never converted, sent, or cleared by the shared server-draft and issued-revision flow below. Only its exact immutable server-issued Deck revision can enter the separate durable quote queue.
       </p>
       {!state.projectId && (
         <div className="space-y-1">
@@ -202,10 +202,31 @@ export function LedgerIntakePanel({
         </div>
       )}
       {state.projectId ? (
-        <p className="text-sm text-amber-400" role="alert">
-          This saved estimate was linked to an existing HBUILD project ({state.projectName || state.projectId}).
-          Do not submit it as a duplicate. Download a copy if needed; use Clear only to start a separate estimate. Deck import is not available from this panel.
-        </p>
+        <>
+          <p className="text-sm text-amber-400" role="alert">
+            This saved estimate was linked to an existing HBUILD project ({state.projectName || state.projectId}).
+            Do not submit it as a duplicate. Its legacy local record remains available below; use Clear only to start a separate estimate.
+          </p>
+          {loadingQueue ? <p className="text-xs text-muted-foreground">Loading legacy local snapshot…</p> : queue ? (
+            <>
+              <div className="text-xs text-muted-foreground space-y-1" role="status">
+                <p>Client and project: {queue.identityDone ? 'Previously accepted Ledger receipt; preserved unchanged' : 'Saved locally only; not delivered'}</p>
+                <p>Estimate PDF: {queue.proposalDone ? 'Previously accepted Ledger receipt; readback unconfirmed' : 'Saved locally only; not delivered'}</p>
+                <p>Takeoff PDF: {queue.takeoffDone ? 'Previously accepted Ledger receipt; readback unconfirmed' : queue.takeoffJson ? 'Saved locally only; not delivered' : 'Missing in this legacy snapshot'}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {queue.proposalJson && <Button type="button" variant="outline" size="sm" onClick={() => {
+                  try { downloadFrozenPdf(queue.proposalJson, 'deck-estimate.pdf'); }
+                  catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not recover the saved proposal PDF.'); }
+                }}>Download saved proposal PDF</Button>}
+                {queue.takeoffJson && <Button type="button" variant="outline" size="sm" onClick={() => {
+                  try { downloadFrozenPdf(queue.takeoffJson, 'deck-takeoff.pdf'); }
+                  catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not recover the saved takeoff PDF.'); }
+                }}>Download saved takeoff PDF</Button>}
+              </div>
+            </>
+          ) : !loadingQueue && <p className="text-xs text-muted-foreground">No legacy local snapshot exists for this source ID.</p>}
+        </>
       ) : !auth ? (
         <p className="text-sm text-amber-400" role="status">Local snapshot storage requires estimator sign-in, which is unavailable here. PDF and Excel downloads remain available.</p>
       ) : !session ? (
@@ -240,7 +261,7 @@ export function LedgerIntakePanel({
       )}
       {message && <p className="text-sm text-amber-200" role="status">{message}</p>}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <p className="text-xs text-muted-foreground">Saved PDF bytes remain in this browser and can be downloaded for recovery. Clearing browser storage removes the local copy. Do not treat this frozen snapshot as queued for future HBUILD delivery; a Deck resume requires a server-issued immutable quote revision and an explicit delivery contract.</p>
+      <p className="text-xs text-muted-foreground">Legacy saved PDF bytes remain in this browser and can be downloaded for recovery; this panel never uploads them. Clearing browser storage removes the local copy. Server-issued revisions and durable queued deliveries are shown separately in Shared drafts & fixed quotes.</p>
     </div>
   );
 }

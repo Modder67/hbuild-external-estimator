@@ -3,6 +3,7 @@ import { EstimateState, DEFAULT_ADDONS, MeasurementType, StairPosts, JoistSize }
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'deck_remodel_pros_estimate_state';
+const HISTORY_KEY = `${STORAGE_KEY}:history`;
 
 const defaultState: EstimateState = {
   sourceId: crypto.randomUUID(),
@@ -71,10 +72,31 @@ export function useEstimateForm() {
     }
     return defaultState;
   });
+  const [history, setHistory] = useState<EstimateState[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      return Array.isArray(saved) ? saved.filter(item => item && typeof item === 'object').slice(0, 50) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+  useEffect(() => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }, [history]);
+
+  const preserveCurrent = () => setHistory(previous => [
+    state,
+    ...previous.filter(item => item.sourceId !== state.sourceId),
+  ].slice(0, 50));
+
+  const restoreState = (next: EstimateState) => {
+    if (JSON.stringify(next) !== JSON.stringify(state)) preserveCurrent();
+    setState(next);
+  };
 
   const updateJobDetails = (field: keyof EstimateState['jobDetails'], value: string) => {
     setState(prev => {
@@ -161,6 +183,7 @@ export function useEstimateForm() {
 
   const clearForm = () => {
     if (window.confirm("Are you sure you want to clear the entire form? This cannot be undone.")) {
+      preserveCurrent();
       setState({
         ...defaultState,
         sourceId: crypto.randomUUID(),
@@ -175,6 +198,8 @@ export function useEstimateForm() {
 
   return {
     state,
+    history,
+    restoreState,
     updateJobDetails,
     setClientSourceId,
     updateMeasurement,

@@ -22,7 +22,7 @@ export const ListEstimatesResponse = zod.object({
   drafts: zod.array(
     zod.object({
       id: zod.string().uuid(),
-      slug: zod.enum(["flooring", "bathroom", "basement"]),
+      slug: zod.enum(["flooring", "bathroom", "basement", "deck"]),
       version: zod.number().min(1),
       project: zod.object({
         sourceId: zod.string().uuid(),
@@ -80,7 +80,7 @@ export const createEstimateBodyProjectJobCodeRegExp = new RegExp(
 export const createEstimateBodyProjectProjectNameMax = 150;
 
 export const CreateEstimateBody = zod.object({
-  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  slug: zod.enum(["flooring", "bathroom", "basement", "deck"]),
   project: zod.object({
     sourceId: zod.string().uuid(),
     clientSourceId: zod.string().uuid(),
@@ -120,7 +120,7 @@ export const getEstimateResponseProjectProjectNameMax = 150;
 
 export const GetEstimateResponse = zod.object({
   id: zod.string().uuid(),
-  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  slug: zod.enum(["flooring", "bathroom", "basement", "deck"]),
   version: zod.number().min(1),
   project: zod.object({
     sourceId: zod.string().uuid(),
@@ -211,7 +211,7 @@ export const updateEstimateResponseProjectProjectNameMax = 150;
 
 export const UpdateEstimateResponse = zod.object({
   id: zod.string().uuid(),
-  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  slug: zod.enum(["flooring", "bathroom", "basement", "deck"]),
   version: zod.number().min(1),
   project: zod.object({
     sourceId: zod.string().uuid(),

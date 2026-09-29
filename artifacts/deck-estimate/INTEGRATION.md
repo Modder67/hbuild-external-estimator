@@ -21,10 +21,18 @@ project identity, not separate child projects. A preliminary download or issued
 revision is not a tax-inclusive contract, HBUILD import, or client release.
 The provider namespace on the proxy remains `deck-estimate`.
 
-Deck still has browser-local authoring and exports; its old browser-generated
-intake payloads do not meet the server's issued-revision guard. It must not
-send them, even when Ledger delivery is provisioned. Deck issuance/authorized
-handoff remains an unresolved integration requirement. The Home Depot bathroom
+Deck now uses the shared server-draft and immutable before-tax revision flow.
+The complete current Deck form is sent as scope, keyed by its existing source
+and client IDs; the server recalculates it. A revision is issueable only when
+the current project, local calculation and totals match a saved server version
+and all calculation/takeoff requirements are resolved. Existing HBUILD
+`projectId` forms are explicitly blocked from being issued as new projects.
+The old browser-generated Ledger intake records/PDFs remain local-only and
+available for recovery; they are never converted, sent, or cleared by the new
+flow. Deck's existing browser PDFs and tax-inclusive local selected total are
+distinct from the server-issued selected-tier BEFORE-TAX quote. A queued frozen
+revision is not evidence of delivery, readback, approval, or client release.
+The Home Depot bathroom
 package contents, unresolved door/carpet/tile rates, pan adjustment policy and
 Ledger's live response contract still need owner confirmation before production
 use.

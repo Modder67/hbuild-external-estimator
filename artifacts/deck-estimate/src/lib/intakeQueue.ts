@@ -15,7 +15,7 @@ export type IssuedQuoteDelivery = {
   key: string;
   kind: 'issued-quote';
   userId: string;
-  slug: 'flooring' | 'bathroom' | 'basement';
+  slug: 'deck' | 'flooring' | 'bathroom' | 'basement';
   draftId: string;
   revision: number;
   sourceId: string;

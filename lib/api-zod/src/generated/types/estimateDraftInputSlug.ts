@@ -13,4 +13,5 @@ export const EstimateDraftInputSlug = {
   flooring: "flooring",
   bathroom: "bathroom",
   basement: "basement",
+  deck: "deck",
 } as const;

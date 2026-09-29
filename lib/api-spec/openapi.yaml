@@ -426,7 +426,7 @@ components:
       required: [id, slug, version, project, calculation, totals, policyVersion, rateBookVersion, updatedAt, createdAt]
       properties:
         id: { type: string, format: uuid }
-        slug: { type: string, enum: [flooring, bathroom, basement] }
+        slug: { type: string, enum: [flooring, bathroom, basement, deck] }
         version: { type: integer, minimum: 1 }
         project: { $ref: "#/components/schemas/ProjectSnapshot" }
         calculation: { $ref: "#/components/schemas/EstimateCalculation" }
@@ -456,7 +456,7 @@ components:
       additionalProperties: false
       required: [slug, project]
       properties:
-        slug: { type: string, enum: [flooring, bathroom, basement] }
+        slug: { type: string, enum: [flooring, bathroom, basement, deck] }
         project: { $ref: "#/components/schemas/ProjectSnapshot" }
     EstimateDraftUpdate:
       type: object

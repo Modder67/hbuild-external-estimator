@@ -12,6 +12,10 @@ import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { generateExcelExport } from '@/lib/excelExport';
 import { useToast } from '@/hooks/use-toast';
 import { LedgerIntakePanel } from '@/components/LedgerIntakePanel';
+import { SharedDraftPanel } from '@/estimators/SharedDraftPanel';
+import { deckProjectFromState, deckStateFromProject } from '@/estimators/deckProject';
+import { calculateForSlug, uniqueLines } from '@workspace/estimator-core';
+import type { Calculation } from '@workspace/estimator-core';
 
 // --- UI Components ---
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -24,6 +28,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 export default function EstimateBuilder() {
   const { 
     state, 
+    history,
+    restoreState,
     updateJobDetails, 
     setClientSourceId,
     updateMeasurement, 
@@ -41,6 +47,29 @@ export default function EstimateBuilder() {
   const { toast } = useToast();
 
   const pricing = useMemo(() => calculatePricing(state), [state]);
+  const deckProject = useMemo(() => deckProjectFromState(state), [state]);
+  const sharedCalculation = useMemo(
+    () => uniqueLines(calculateForSlug('deck', state)) as Calculation,
+    [state],
+  );
+  const localProjectHistory = useMemo(
+    () => history.map(deckProjectFromState),
+    [history],
+  );
+  const takeoffAvailable = Object.values(pricing.lumber).some(value =>
+    value && typeof value === 'object' && 'qty' in value && value.qty > 0);
+  const missingTakeoffSelections = [
+    pricing.totalLedgerLf > 0 && !state.lumberSelections.ledger ? 'ledger lumber' : '',
+    pricing.totalLf > 0 && !state.lumberSelections.framing ? 'framing lumber' : '',
+    pricing.totalLf > 0 && !state.lumberSelections.joist ? 'joist lumber' : '',
+    state.measurements.beam.some(value => value > 0) && !state.lumberSelections.beam ? 'beam lumber' : '',
+    state.measurements.postCount.some(value => value > 0) && !state.lumberSelections.post ? 'post lumber' : '',
+  ].filter(Boolean);
+  const issuanceBlockReason = state.projectId
+    ? `This Deck form is linked to existing HBUILD project ${state.projectName || state.projectId}. Do not issue or queue it as a new job. Use Clear only after confirming this job is preserved; its browser history and legacy saved PDFs remain available.`
+    : missingTakeoffSelections.length > 0 || !takeoffAvailable
+      ? `A complete Deck takeoff is not ready${missingTakeoffSelections.length ? `: select ${missingTakeoffSelections.join(', ')}.` : ': select at least one lumber option for measured work.'} Save the updated server draft before issuing.`
+      : undefined;
 
   const handleGeneratePDF = async () => {
     if (!state.jobDetails.customerName) {
@@ -672,6 +701,35 @@ export default function EstimateBuilder() {
           </CardContent>
         </Card>
 
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+          <p className="text-sm font-semibold text-amber-200">Legacy browser estimate vs issued quote</p>
+          <p className="text-sm text-amber-100/90">
+            The Deck builder’s selected total and existing browser PDF exports are legacy, tax-inclusive local estimates.
+            A shared server revision is a separate, server-recomputed BEFORE-TAX amount for the selected tier; it is not
+            interchangeable with the legacy total and cannot be issued until this exact project and calculation match a saved server revision.
+          </p>
+          {(!takeoffAvailable || missingTakeoffSelections.length > 0) && (
+            <p className="text-sm font-medium text-amber-200" role="alert">
+              Takeoff selections are missing{missingTakeoffSelections.length ? `: ${missingTakeoffSelections.join(', ')}` : ''}. A complete issued delivery is not ready; choose lumber for measured work before issuing.
+            </p>
+          )}
+          {state.projectId && (
+            <p className="text-sm font-medium text-amber-200" role="alert">
+              Existing HBUILD project link detected. This job cannot be issued or queued as a new Deck project. Preserve its local history and PDFs; use Clear only when intentionally starting a separate job.
+            </p>
+          )}
+        </div>
+
+        <SharedDraftPanel
+          slug="deck"
+          project={deckProject}
+          calculation={sharedCalculation}
+          localDrafts={[deckProject, ...localProjectHistory]}
+          onLoadProject={project => restoreState(deckStateFromProject(project))}
+          onLoadLocalProject={project => restoreState(deckStateFromProject(project))}
+          issuanceBlockReason={issuanceBlockReason}
+        />
+
         {/* Live Pricing Breakdown */}
         <Card className="border-l-4 border-l-secondary overflow-hidden shadow-xl shadow-black/30">
           <CardHeader className="bg-secondary/10 pb-4 border-b border-border">
@@ -827,7 +885,7 @@ export default function EstimateBuilder() {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="hidden sm:block shrink-0">
-            <p className="text-sm text-muted-foreground">Selected Total:</p>
+            <p className="text-xs text-muted-foreground">Legacy browser total · tax included</p>
             <p className="text-xl font-display font-bold text-primary">
               {formatCurrency(pricing.totals[state.selectedMarkup])}
             </p>

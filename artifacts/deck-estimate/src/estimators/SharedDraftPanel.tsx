@@ -32,6 +32,7 @@ import {
 import { IssuedQuoteQueuePanel } from './IssuedQuoteQueuePanel';
 import type { EstimatorProject } from './project';
 import { money, totals, type Calculation } from './types';
+import { totalsForSlug } from '@workspace/estimator-core';
 
 type EstimateTotals = ReturnType<typeof totals>;
 
@@ -63,12 +64,13 @@ export type IssuedQuote<T = unknown> = {
 };
 
 type Props<T> = {
-  slug: 'flooring' | 'bathroom' | 'basement';
+  slug: 'deck' | 'flooring' | 'bathroom' | 'basement';
   project: EstimatorProject<T>;
   calculation: Calculation;
   localDrafts: EstimatorProject<T>[];
   onLoadProject: (project: EstimatorProject<T>) => void;
   onLoadLocalProject: (project: EstimatorProject<T>) => void;
+  issuanceBlockReason?: string;
 };
 
 type DeliveryMetadata = {
@@ -129,7 +131,7 @@ async function requestJson<T>(path: string, token: string, method = 'GET', body?
 }
 
 export function SharedDraftPanel<T>({
-  slug, project, calculation, localDrafts, onLoadProject, onLoadLocalProject,
+  slug, project, calculation, localDrafts, onLoadProject, onLoadLocalProject, issuanceBlockReason,
 }: Props<T>) {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
@@ -286,9 +288,27 @@ export function SharedDraftPanel<T>({
     [drafts, project.sourceId],
   );
   const sameAsServer = Boolean(active && stableStringify(active.project) === stableStringify(project));
-  const localTotals = useMemo(() => totals(calculation), [calculation]);
+  const localTotalsResult = useMemo(
+    () => {
+      try {
+        return {
+          totals: slug === 'deck'
+            ? totalsForSlug(slug, calculation, project.scope)
+            : totals(calculation),
+          error: '',
+        };
+      } catch (failure) {
+        return {
+          totals: { directCents: 0, companyCents: 0, incidentalsCents: 0, accidentsCents: 0, salesCents: 0, beforeTaxCents: 0 },
+          error: failure instanceof Error ? failure.message : 'Local totals are unavailable for this scope.',
+        };
+      }
+    },
+    [slug, calculation, project.scope],
+  );
+  const localTotals = localTotalsResult.totals;
   const serverCalculationMatches = Boolean(active && stableStringify(active.calculation) === stableStringify(calculation));
-  const serverTotalsMatch = Boolean(active && stableStringify(active.totals) === stableStringify(localTotals));
+  const serverTotalsMatch = Boolean(active && !localTotalsResult.error && stableStringify(active.totals) === stableStringify(localTotals));
   const serverHasIssues = Boolean(active?.calculation.issues.length);
   const authoritativeMatch = sameAsServer && serverCalculationMatches && serverTotalsMatch;
   const revisionsFor = useCallback(async (draftId: string, token: string) => {
@@ -587,7 +607,7 @@ export function SharedDraftPanel<T>({
   };
 
   const issueQuote = async () => {
-    if (!active || !authoritativeMatch || calculation.issues.length || serverHasIssues) return;
+    if (!active || !authoritativeMatch || calculation.issues.length || serverHasIssues || issuanceBlockReason) return;
     if (!window.confirm('Issue an immutable quote revision using this saved server version? BEFORE TAX ONLY: tax is not calculated, this is not a tax-inclusive final amount, and it is not released to the client.')) return;
     setWorking(true);
     setError('');
@@ -781,9 +801,11 @@ export function SharedDraftPanel<T>({
                 <h3 className="font-medium">Local review vs server-authoritative saved estimate</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded border border-border/70 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current local calculation</p>
-                    <p className="mt-1 text-sm">Direct cost: <strong>{money(localTotals.directCents)}</strong></p>
-                    <p className="text-sm">Before tax: <strong>{money(localTotals.beforeTaxCents)}</strong></p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {slug === 'deck' ? 'Deck scope · server-policy comparison (before tax)' : 'Current local calculation'}
+                    </p>
+                    <p className="mt-1 text-sm">Direct cost: <strong>{localTotalsResult.error ? 'Unavailable' : money(localTotals.directCents)}</strong></p>
+                    <p className="text-sm">Before tax: <strong>{localTotalsResult.error ? 'Unavailable' : money(localTotals.beforeTaxCents)}</strong></p>
                     <p className="text-xs">Calculation issues: {calculation.issues.length}</p>
                   </div>
                   <div className="rounded border border-primary/30 p-3">
@@ -793,6 +815,11 @@ export function SharedDraftPanel<T>({
                     <p className="text-xs">Server calculation issues: {active.calculation.issues.length}</p>
                   </div>
                 </div>
+                {localTotalsResult.error && (
+                  <p className="text-sm text-amber-300" role="alert">
+                    Server-policy local totals are unavailable for this scope: {localTotalsResult.error}
+                  </p>
+                )}
                 {active.calculation.issues.length > 0 && (
                   <div className="rounded border border-amber-600/40 bg-amber-500/10 p-3" role="status">
                     <p className="text-sm font-medium">Server-authoritative calculation issues</p>
@@ -820,7 +847,8 @@ export function SharedDraftPanel<T>({
               {calculation.issues.length > 0 && <p className="text-sm text-amber-300" role="status">Issuance blocked: resolve all {calculation.issues.length} calculation issue(s).</p>}
               {serverHasIssues && <p className="text-sm text-amber-300" role="status">Issuance blocked: resolve server-authoritative calculation issues and re-save.</p>}
               {!sameAsServer && !estimateMismatch && <p className="text-sm text-amber-300" role="status">Save the current local edits to this server draft before issuing.</p>}
-              <Button type="button" data-testid="button-issue-quote" disabled={working || loading || !authoritativeMatch || calculation.issues.length > 0 || serverHasIssues} onClick={() => void issueQuote()}>
+              {issuanceBlockReason && <p className="text-sm text-amber-300" role="alert">{issuanceBlockReason}</p>}
+              <Button type="button" data-testid="button-issue-quote" disabled={working || loading || !authoritativeMatch || calculation.issues.length > 0 || serverHasIssues || Boolean(issuanceBlockReason)} onClick={() => void issueQuote()}>
                 Issue before-tax quote revision
               </Button>
 

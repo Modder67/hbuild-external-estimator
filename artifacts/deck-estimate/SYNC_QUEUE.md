@@ -37,9 +37,16 @@ exact reason marker, not response prose.
 
 The pause is scoped to the HBUILD connection. Do not work around it via manual
 creation, another HBUILD endpoint, unsigned requests or direct HBUILD database
-access. New provider-account creation is not a resume mechanism. Deck's
-legacy browser-built payloads cannot currently pass the estimator's
-issued-revision intake guard; they remain visible but must not be forwarded.
+access. New provider-account creation is not a resume mechanism. Deck now
+queues only the frozen identity/proposal/takeoff bodies from an immutable
+server-issued revision, in the same issue-time order as Flooring, Bathroom and
+Basement. Its legacy browser-built intake records and PDFs remain visible and
+recoverable in their local-only panel; they are never migrated into this queue,
+sent, replaced, or cleared by it. Deck scopes linked to an existing HBUILD
+`projectId` cannot be issued or queued as a new job. A missing lumber takeoff
+selection is an explicit issuance blocker, not a delivery-ready state. The
+legacy Deck selected total/PDF is tax-inclusive; server-issued Deck revisions
+are selected-tier BEFORE-TAX amounts and are separate artifacts.
 The referenced updated Ledger contract section was not supplied in this
 workspace; the exact pause marker and Retry-After behavior above come from the
 owner-provided pause specification.
