@@ -35,7 +35,7 @@ type AuthorizationFailure = { error: string; status: number };
 
 async function authorize(req: Request): Promise<Authorized | AuthorizationFailure> {
   const config = gatewayConfig();
-  const staffIds = process.env.H_LEDGER_INTAKE_STAFF_USER_IDS?.split(",").map(id => id.trim()).filter(id => uuid.test(id)) ?? [];
+  const staffIds = process.env.ESTIMATOR_STAFF_USER_IDS?.split(",").map(id => id.trim()).filter(id => uuid.test(id)) ?? [];
   if (!config || !staffIds.length) {
     return { error: "Estimator persistence is not provisioned for approved staff.", status: 503 };
   }

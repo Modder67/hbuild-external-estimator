@@ -37,3 +37,6 @@ SUPABASE_PUBLISHABLE_KEY = "sb_publishable_o8vRo4RlZGF3phj2eWNIMQ_apL3u7Jw"
 SUPABASE_URL = "https://hiseqnrxuldhfuhqklkh.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_o8vRo4RlZGF3phj2eWNIMQ_apL3u7Jw"
 VITE_SUPABASE_URL = "https://hiseqnrxuldhfuhqklkh.supabase.co"
+
+[userenv.shared]
+ESTIMATOR_STAFF_USER_IDS = "835c7a3b-1ff1-43e9-b20e-43231a8353ae,78b4aa36-8951-4922-8701-88eff5db8783"
