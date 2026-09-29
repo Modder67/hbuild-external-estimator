@@ -719,7 +719,7 @@ export function SharedDraftPanel<T>({
     <section className="rounded-xl border border-primary/25 bg-card/70 p-5 space-y-4" aria-labelledby={`${slug}-shared-title`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold" id={`${slug}-shared-title`}>Shared drafts & fixed quotes</h2>
+          <h2 className="scroll-mt-32 text-lg font-semibold" id={`${slug}-shared-title`}>Shared drafts & fixed quotes</h2>
           <p className="mt-1 text-sm text-muted-foreground">Local autosave and offline exports remain available. Server changes happen only when you choose an explicit action.</p>
         </div>
         {session && <Button type="button" variant="outline" size="sm" data-testid="button-sign-out-shared" onClick={() => void estimatorAuth?.auth.signOut()}>Sign out</Button>}
@@ -728,11 +728,14 @@ export function SharedDraftPanel<T>({
       {!estimatorAuth ? (
         <p className="text-sm text-amber-300" role="status">Shared estimates are unavailable because sign-in is not configured. Local drafts and downloads remain available.</p>
       ) : !session ? (
-        <form onSubmit={signIn} className="flex flex-col gap-2 sm:flex-row" aria-label="Sign in to shared estimates">
-          <Input data-testid="input-shared-email" type="email" autoComplete="username" aria-label="HBUILD email" placeholder="HBUILD email" value={email} onChange={event => setEmail(event.target.value)} required />
-          <Input data-testid="input-shared-password" type="password" autoComplete="current-password" aria-label="Password" placeholder="Password" value={password} onChange={event => setPassword(event.target.value)} required />
-          <Button data-testid="button-sign-in-shared" type="submit" disabled={working}>{working ? 'Signing in…' : 'Sign in to load shared drafts'}</Button>
-        </form>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Sign in here, then save or load a server draft. The “Issue before-tax quote revision” button appears with that draft.</p>
+          <form onSubmit={signIn} className="flex flex-col gap-2 sm:flex-row" aria-label="Sign in to shared estimates">
+            <Input data-testid="input-shared-email" type="email" autoComplete="username" aria-label="HBUILD email" placeholder="HBUILD email" value={email} onChange={event => setEmail(event.target.value)} required />
+            <Input data-testid="input-shared-password" type="password" autoComplete="current-password" aria-label="Password" placeholder="Password" value={password} onChange={event => setPassword(event.target.value)} required />
+            <Button data-testid="button-sign-in-shared" type="submit" disabled={working}>{working ? 'Signing in…' : 'Sign in to load shared drafts'}</Button>
+          </form>
+        </div>
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground" role="status" data-testid="status-shared-save">

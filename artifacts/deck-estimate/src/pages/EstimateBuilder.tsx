@@ -137,6 +137,16 @@ export default function EstimateBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+            <div className="md:col-span-2 rounded-lg border border-primary/40 bg-primary/10 p-4 space-y-2">
+              <p className="font-semibold">Need to issue a Deck quote?</p>
+              <p className="text-sm text-muted-foreground">
+                Complete the details and measurements, then sign in and save a server draft in Shared drafts & fixed quotes.
+                The “Issue before-tax quote revision” button appears there after a server draft is loaded.
+              </p>
+              <a href="#deck-shared-title" className="inline-block text-sm font-semibold text-primary underline underline-offset-4">
+                Go to shared drafts & fixed quotes
+              </a>
+            </div>
             <LedgerIntakePanel state={state} pricing={pricing} onClientSourceIdChange={setClientSourceId} />
             <div className="space-y-2">
               <Label>Salesperson</Label>

@@ -188,7 +188,7 @@ export function LedgerIntakePanel({
   return (
     <div className="md:col-span-2 rounded-lg border border-border bg-background/40 p-4 space-y-3">
       <div className="flex justify-between gap-2 items-center">
-        <strong className="text-sm">HBUILD intake</strong>
+        <strong className="text-sm">Legacy browser records (not issued quotes)</strong>
         {session && <Button type="button" variant="ghost" size="sm" onClick={() => void auth?.auth.signOut()}>Sign out</Button>}
       </div>
       <p className="text-sm text-amber-400" role="status">
