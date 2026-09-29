@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react';
-import { createClient, type Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
+import { estimatorAuth as auth } from '@/lib/supabaseAuth';
 import type { PricingBreakdown, EstimateState } from '@/lib/pricing';
 import { generateEstimatePDF } from '@/lib/pdfExport';
 import { generateLumberTakeoffPDF } from '@/lib/pdfLumberTakeoff';
 import { loadIntake, saveIntake, type PendingIntake } from '@/lib/intakeQueue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const auth = url && key ? createClient(url, key, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-}) : null;
 
 async function pdfPayload(blob: Blob, type: 'proposal' | 'takeoff', originalName: string) {
   if (blob.size > 8 * 1024 * 1024) throw new Error(`${type} PDF exceeds the 8 MiB intake limit.`);

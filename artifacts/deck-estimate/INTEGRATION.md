@@ -1,5 +1,33 @@
 # HBUILD estimator intake
 
+## Four local estimators
+
+The estimator workspace now has four independent tabs: Deck, Flooring & Doors,
+Bathroom, and Basement Remodeling. Each has a separate locally saved draft and
+its own Excel workbook download. Flooring/Bathroom calculations return unmarked
+direct-cost lines; Basement composes those lines with wall, soffit, egress and
+electrical scope and applies the additive 35% + 20% + 50% + 7% markup only once.
+Each of the three new modules also generates a preliminary proposal PDF and
+material-takeoff PDF. Unresolved material rates, scope ownership or measurements
+appear as issues, and the displayed amount is a known-cost subtotal, not a
+complete quote. Tax jurisdiction is not configured.
+
+The new tabs reuse the existing guarded Ledger proxy with one source project
+identity per job. Basement does **not** create separate HBUILD projects for its
+child calculators. The provider namespace on the proxy is still
+`deck-estimate`; its UUID source IDs keep the jobs distinct across tabs.
+The three new tabs' PDF deliveries are blocked if their pricing/scope issues
+remain. All four tabs keep downloads available while intake is disabled.
+
+These new drafts are browser-local, not synchronized or permission-controlled
+server records. The attached build prompts call for authoritative server
+recalculation, audited rate edits, immutable issued quote revisions and
+cross-device optimistic concurrency; those capabilities have **not** been
+built. Do not treat a downloaded preliminary PDF or workbook as an issued
+contract. The Home Depot bathroom package contents, unresolved door/carpet/tile
+rates, pan adjustment policy and Ledger's live response contract still need
+owner confirmation before production use.
+
 The new-job workflow follows the attached HBUILD external-estimator intake contract.
 It does **not** write the shared database or H Docs directly. The old existing-project
 picker is no longer rendered. Saved forms carrying an old HBUILD project ID are
