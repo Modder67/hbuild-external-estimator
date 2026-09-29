@@ -1,26 +1,34 @@
 import { createHash } from "node:crypto";
-import { Storage } from "@google-cloud/storage";
+import { eq } from "drizzle-orm";
+import { db, privatePdfsTable } from "@workspace/db";
 import type { Calculation } from "@workspace/estimator-core";
 
+/**
+ * Private PDF storage backends. With PRIVATE_OBJECT_DIR set (Replit), PDFs go
+ * to Replit's object storage through the local sidecar, exactly as before.
+ * Without it (e.g. Netlify), PDFs live in the estimator's own Postgres
+ * (`estimator_private_pdfs`), same path key, same no-overwrite rule as
+ * ifGenerationMatch(0). Bytes are capped at 8 MiB upstream either way.
+ */
 const sidecar = "http://127.0.0.1:1106";
-const storage = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${sidecar}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${sidecar}/credential`,
-      format: { type: "json", subject_token_field_name: "access_token" },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
 
-function privateLocation(relativePath: string) {
-  const dir = process.env.PRIVATE_OBJECT_DIR?.trim();
-  if (!dir) throw new Error("PRIVATE_OBJECT_DIR is not configured.");
+async function gcsLocation(relativePath: string, dir: string) {
+  // Imported lazily so hosts without the sidecar never load or bundle-init GCS.
+  const { Storage } = await import("@google-cloud/storage");
+  const storage = new Storage({
+    credentials: {
+      audience: "replit",
+      subject_token_type: "access_token",
+      token_url: `${sidecar}/token`,
+      type: "external_account",
+      credential_source: {
+        url: `${sidecar}/credential`,
+        format: { type: "json", subject_token_field_name: "access_token" },
+      },
+      universe_domain: "googleapis.com",
+    },
+    projectId: "",
+  });
   const clean = dir.replace(/^\/+|\/+$/g, "");
   const [bucketName, ...prefix] = clean.split("/");
   if (!bucketName || !prefix.length) throw new Error("PRIVATE_OBJECT_DIR is invalid.");
@@ -28,19 +36,35 @@ function privateLocation(relativePath: string) {
 }
 
 export async function savePrivatePdf(path: string, bytes: Buffer): Promise<void> {
-  const target = privateLocation(path);
-  await target.bucket.file(target.path).save(bytes, {
-    resumable: false,
-    validation: "crc32c",
-    preconditionOpts: { ifGenerationMatch: 0 },
-    metadata: { contentType: "application/pdf", cacheControl: "private, no-store" },
-  });
+  const dir = process.env.PRIVATE_OBJECT_DIR?.trim();
+  if (dir) {
+    const target = await gcsLocation(path, dir);
+    await target.bucket.file(target.path).save(bytes, {
+      resumable: false,
+      validation: "crc32c",
+      preconditionOpts: { ifGenerationMatch: 0 },
+      metadata: { contentType: "application/pdf", cacheControl: "private, no-store" },
+    });
+    return;
+  }
+  const inserted = await db.insert(privatePdfsTable)
+    .values({ path, bytes })
+    .onConflictDoNothing({ target: privatePdfsTable.path })
+    .returning({ path: privatePdfsTable.path });
+  if (inserted.length !== 1) throw new Error(`A private PDF already exists at ${path}.`);
 }
 
 export async function readPrivatePdf(path: string): Promise<Buffer> {
-  const target = privateLocation(path);
-  const [bytes] = await target.bucket.file(target.path).download();
-  return bytes;
+  const dir = process.env.PRIVATE_OBJECT_DIR?.trim();
+  if (dir) {
+    const target = await gcsLocation(path, dir);
+    const [bytes] = await target.bucket.file(target.path).download();
+    return bytes;
+  }
+  const [row] = await db.select({ bytes: privatePdfsTable.bytes })
+    .from(privatePdfsTable).where(eq(privatePdfsTable.path, path)).limit(1);
+  if (!row) throw new Error(`No private PDF stored at ${path}.`);
+  return Buffer.isBuffer(row.bytes) ? row.bytes : Buffer.from(row.bytes);
 }
 
 export function sha256(bytes: Buffer): string {

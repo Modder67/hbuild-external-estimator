@@ -1,4 +1,5 @@
 import {
+  customType,
   integer,
   jsonb,
   pgTable,
@@ -64,7 +65,21 @@ export const estimatorIntakeConnectionsTable = pgTable("estimator_intake_connect
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Private PDF bytes for hosts without Replit's object-storage sidecar
+ * (e.g. Netlify). Keyed by the same relative path `savePrivatePdf` has always
+ * used; ifGenerationMatch(0) semantics are kept by refusing overwrites.
+ */
+export const privatePdfsTable = pgTable("estimator_private_pdfs", {
+  path: text("path").primaryKey(),
+  bytes: customType<{ data: Buffer; driverData: Buffer }>({
+    dataType: () => "bytea",
+  })("bytes").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type EstimateDraftRecord = typeof estimateDraftsTable.$inferSelect;
 export type IssuedQuoteRecord = typeof issuedQuotesTable.$inferSelect;
 export type EstimateDeliveryRecord = typeof estimateDeliveriesTable.$inferSelect;
 export type EstimatorIntakeConnectionRecord = typeof estimatorIntakeConnectionsTable.$inferSelect;
+export type PrivatePdfRecord = typeof privatePdfsTable.$inferSelect;
