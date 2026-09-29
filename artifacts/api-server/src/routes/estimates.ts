@@ -35,8 +35,11 @@ type AuthorizationFailure = { error: string; status: number };
 
 async function authorize(req: Request): Promise<Authorized | AuthorizationFailure> {
   const config = gatewayConfig();
-  const staffIds = process.env.ESTIMATOR_STAFF_USER_IDS?.split(",").map(id => id.trim()).filter(id => uuid.test(id)) ?? [];
-  if (!config || !staffIds.length) {
+  // Quote staff share the existing intake staff allowlist unless an explicit
+  // estimator-specific list is provisioned. An invalid explicit list fails closed.
+  const staffList = process.env.ESTIMATOR_STAFF_USER_IDS ?? process.env.H_LEDGER_INTAKE_STAFF_USER_IDS;
+  const staffIds = staffList?.split(",").map(id => id.trim()) ?? [];
+  if (!config || !staffIds.length || staffIds.some(id => !uuid.test(id))) {
     return { error: "Estimator persistence is not provisioned for approved staff.", status: 503 };
   }
   const userId = await verifiedUser(req, config);

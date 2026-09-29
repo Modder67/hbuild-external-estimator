@@ -2,3 +2,4 @@
 - [Estimator intake authority](estimator-intake-authority.md) — new jobs originate in this estimator and enter HBUILD through Ledger, not a picker of existing projects.
 - [Generated API date-time validation](api-codegen-dates.md) — validate Date values before JSON serialization; ISO strings can fail post-write response validation.
 - [Deck quote policy](deck-quote-policy.md) — issued Deck revisions are pre-tax and cannot inherit legacy browser tax or incomplete material selections.
+- [Estimator staff authorization](estimator-staff-authorization.md) — user approved sharing the existing HBUILD intake staff allowlist for quote drafts and issuance.
