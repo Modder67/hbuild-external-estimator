@@ -17,12 +17,20 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  EstimateDeliverySnapshot,
+  EstimateDraft,
+  EstimateDraftInput,
+  EstimateDraftList,
+  EstimateDraftUpdate,
+  EstimateIssueInput,
   EstimatorDocumentDelivery,
   EstimatorProjectDelivery,
   GetMeshStatus200,
   HealthStatus,
   IntakeReceipt,
   IntakeStatus,
+  IssuedQuote,
+  IssuedQuoteList,
   ListMeshProjects200,
   MeshProjectDetails,
 } from "./api.schemas";
@@ -35,6 +43,826 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary List shared organization estimate drafts
+ */
+export const getListEstimatesUrl = () => {
+  return `/api/estimates`;
+};
+
+export const listEstimates = async (
+  options?: RequestInit,
+): Promise<EstimateDraftList> => {
+  return customFetch<EstimateDraftList>(getListEstimatesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListEstimatesQueryKey = () => {
+  return [`/api/estimates`] as const;
+};
+
+export const getListEstimatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEstimates>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEstimates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListEstimatesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listEstimates>>> = ({
+    signal,
+  }) => listEstimates({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEstimates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListEstimatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEstimates>>
+>;
+export type ListEstimatesQueryError = ErrorType<void>;
+
+/**
+ * @summary List shared organization estimate drafts
+ */
+
+export function useListEstimates<
+  TData = Awaited<ReturnType<typeof listEstimates>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEstimates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEstimatesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a recalculated shared estimate draft
+ */
+export const getCreateEstimateUrl = () => {
+  return `/api/estimates`;
+};
+
+export const createEstimate = async (
+  estimateDraftInput: EstimateDraftInput,
+  options?: RequestInit,
+): Promise<EstimateDraft> => {
+  return customFetch<EstimateDraft>(getCreateEstimateUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateDraftInput),
+  });
+};
+
+export const getCreateEstimateMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createEstimate>>,
+    TError,
+    { data: BodyType<EstimateDraftInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createEstimate>>,
+  TError,
+  { data: BodyType<EstimateDraftInput> },
+  TContext
+> => {
+  const mutationKey = ["createEstimate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createEstimate>>,
+    { data: BodyType<EstimateDraftInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createEstimate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateEstimateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createEstimate>>
+>;
+export type CreateEstimateMutationBody = BodyType<EstimateDraftInput>;
+export type CreateEstimateMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a recalculated shared estimate draft
+ */
+export const useCreateEstimate = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createEstimate>>,
+    TError,
+    { data: BodyType<EstimateDraftInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createEstimate>>,
+  TError,
+  { data: BodyType<EstimateDraftInput> },
+  TContext
+> => {
+  return useMutation(getCreateEstimateMutationOptions(options));
+};
+
+/**
+ * @summary Read a shared estimate draft
+ */
+export const getGetEstimateUrl = (id: string) => {
+  return `/api/estimates/${id}`;
+};
+
+export const getEstimate = async (
+  id: string,
+  options?: RequestInit,
+): Promise<EstimateDraft> => {
+  return customFetch<EstimateDraft>(getGetEstimateUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateQueryKey = (id: string) => {
+  return [`/api/estimates/${id}`] as const;
+};
+
+export const getGetEstimateQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimate>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEstimateQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEstimate>>> = ({
+    signal,
+  }) => getEstimate(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimate>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimate>>
+>;
+export type GetEstimateQueryError = ErrorType<void>;
+
+/**
+ * @summary Read a shared estimate draft
+ */
+
+export function useGetEstimate<
+  TData = Awaited<ReturnType<typeof getEstimate>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Compare-and-swap an estimate draft and recalculate it
+ */
+export const getUpdateEstimateUrl = (id: string) => {
+  return `/api/estimates/${id}`;
+};
+
+export const updateEstimate = async (
+  id: string,
+  estimateDraftUpdate: EstimateDraftUpdate,
+  options?: RequestInit,
+): Promise<EstimateDraft> => {
+  return customFetch<EstimateDraft>(getUpdateEstimateUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateDraftUpdate),
+  });
+};
+
+export const getUpdateEstimateMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEstimate>>,
+    TError,
+    { id: string; data: BodyType<EstimateDraftUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEstimate>>,
+  TError,
+  { id: string; data: BodyType<EstimateDraftUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateEstimate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEstimate>>,
+    { id: string; data: BodyType<EstimateDraftUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateEstimate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEstimateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEstimate>>
+>;
+export type UpdateEstimateMutationBody = BodyType<EstimateDraftUpdate>;
+export type UpdateEstimateMutationError = ErrorType<void>;
+
+/**
+ * @summary Compare-and-swap an estimate draft and recalculate it
+ */
+export const useUpdateEstimate = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEstimate>>,
+    TError,
+    { id: string; data: BodyType<EstimateDraftUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEstimate>>,
+  TError,
+  { id: string; data: BodyType<EstimateDraftUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateEstimateMutationOptions(options));
+};
+
+/**
+ * @summary Issue an immutable before-tax quote revision
+ */
+export const getIssueEstimateUrl = (id: string) => {
+  return `/api/estimates/${id}/issue`;
+};
+
+export const issueEstimate = async (
+  id: string,
+  estimateIssueInput: EstimateIssueInput,
+  options?: RequestInit,
+): Promise<IssuedQuote> => {
+  return customFetch<IssuedQuote>(getIssueEstimateUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateIssueInput),
+  });
+};
+
+export const getIssueEstimateMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueEstimate>>,
+    TError,
+    { id: string; data: BodyType<EstimateIssueInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issueEstimate>>,
+  TError,
+  { id: string; data: BodyType<EstimateIssueInput> },
+  TContext
+> => {
+  const mutationKey = ["issueEstimate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issueEstimate>>,
+    { id: string; data: BodyType<EstimateIssueInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issueEstimate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssueEstimateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issueEstimate>>
+>;
+export type IssueEstimateMutationBody = BodyType<EstimateIssueInput>;
+export type IssueEstimateMutationError = ErrorType<void>;
+
+/**
+ * @summary Issue an immutable before-tax quote revision
+ */
+export const useIssueEstimate = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueEstimate>>,
+    TError,
+    { id: string; data: BodyType<EstimateIssueInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof issueEstimate>>,
+  TError,
+  { id: string; data: BodyType<EstimateIssueInput> },
+  TContext
+> => {
+  return useMutation(getIssueEstimateMutationOptions(options));
+};
+
+/**
+ * @summary List immutable issued quote revisions
+ */
+export const getGetEstimateRevisionsUrl = (id: string) => {
+  return `/api/estimates/${id}/revisions`;
+};
+
+export const getEstimateRevisions = async (
+  id: string,
+  options?: RequestInit,
+): Promise<IssuedQuoteList> => {
+  return customFetch<IssuedQuoteList>(getGetEstimateRevisionsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateRevisionsQueryKey = (id: string) => {
+  return [`/api/estimates/${id}/revisions`] as const;
+};
+
+export const getGetEstimateRevisionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateRevisions>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevisions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEstimateRevisionsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateRevisions>>
+  > = ({ signal }) => getEstimateRevisions(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateRevisions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateRevisionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateRevisions>>
+>;
+export type GetEstimateRevisionsQueryError = ErrorType<void>;
+
+/**
+ * @summary List immutable issued quote revisions
+ */
+
+export function useGetEstimateRevisions<
+  TData = Awaited<ReturnType<typeof getEstimateRevisions>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevisions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateRevisionsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read an immutable issued quote revision
+ */
+export const getGetEstimateRevisionUrl = (id: string, revision: number) => {
+  return `/api/estimates/${id}/revisions/${revision}`;
+};
+
+export const getEstimateRevision = async (
+  id: string,
+  revision: number,
+  options?: RequestInit,
+): Promise<IssuedQuote> => {
+  return customFetch<IssuedQuote>(getGetEstimateRevisionUrl(id, revision), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateRevisionQueryKey = (
+  id: string,
+  revision: number,
+) => {
+  return [`/api/estimates/${id}/revisions/${revision}`] as const;
+};
+
+export const getGetEstimateRevisionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateRevision>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevision>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEstimateRevisionQueryKey(id, revision);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateRevision>>
+  > = ({ signal }) =>
+    getEstimateRevision(id, revision, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(id && revision),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateRevision>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateRevisionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateRevision>>
+>;
+export type GetEstimateRevisionQueryError = ErrorType<void>;
+
+/**
+ * @summary Read an immutable issued quote revision
+ */
+
+export function useGetEstimateRevision<
+  TData = Awaited<ReturnType<typeof getEstimateRevision>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevision>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateRevisionQueryOptions(
+    id,
+    revision,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read frozen identity and document JSON for exact delivery retries
+ */
+export const getGetEstimateDeliveryUrl = (id: string, revision: number) => {
+  return `/api/estimates/${id}/revisions/${revision}/delivery`;
+};
+
+export const getEstimateDelivery = async (
+  id: string,
+  revision: number,
+  options?: RequestInit,
+): Promise<EstimateDeliverySnapshot> => {
+  return customFetch<EstimateDeliverySnapshot>(
+    getGetEstimateDeliveryUrl(id, revision),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEstimateDeliveryQueryKey = (
+  id: string,
+  revision: number,
+) => {
+  return [`/api/estimates/${id}/revisions/${revision}/delivery`] as const;
+};
+
+export const getGetEstimateDeliveryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEstimateDeliveryQueryKey(id, revision);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateDelivery>>
+  > = ({ signal }) =>
+    getEstimateDelivery(id, revision, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(id && revision),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateDelivery>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateDeliveryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateDelivery>>
+>;
+export type GetEstimateDeliveryQueryError = ErrorType<void>;
+
+/**
+ * @summary Read frozen identity and document JSON for exact delivery retries
+ */
+
+export function useGetEstimateDelivery<
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateDeliveryQueryOptions(
+    id,
+    revision,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a private frozen issued quote PDF
+ */
+export const getGetEstimateRevisionPdfUrl = (
+  id: string,
+  revision: number,
+  type: "proposal" | "takeoff",
+) => {
+  return `/api/estimates/${id}/revisions/${revision}/pdf/${type}`;
+};
+
+export const getEstimateRevisionPdf = async (
+  id: string,
+  revision: number,
+  type: "proposal" | "takeoff",
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetEstimateRevisionPdfUrl(id, revision, type), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateRevisionPdfQueryKey = (
+  id: string,
+  revision: number,
+  type: "proposal" | "takeoff",
+) => {
+  return [`/api/estimates/${id}/revisions/${revision}/pdf/${type}`] as const;
+};
+
+export const getGetEstimateRevisionPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateRevisionPdf>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  type: "proposal" | "takeoff",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevisionPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetEstimateRevisionPdfQueryKey(id, revision, type);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateRevisionPdf>>
+  > = ({ signal }) =>
+    getEstimateRevisionPdf(id, revision, type, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(id && revision && type),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateRevisionPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateRevisionPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateRevisionPdf>>
+>;
+export type GetEstimateRevisionPdfQueryError = ErrorType<void>;
+
+/**
+ * @summary Download a private frozen issued quote PDF
+ */
+
+export function useGetEstimateRevisionPdf<
+  TData = Awaited<ReturnType<typeof getEstimateRevisionPdf>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  revision: number,
+  type: "proposal" | "takeoff",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateRevisionPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateRevisionPdfQueryOptions(
+    id,
+    revision,
+    type,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Check whether the server-side Ledger intake is provisioned

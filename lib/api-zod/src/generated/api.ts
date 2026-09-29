@@ -8,6 +8,555 @@
 import * as zod from "zod";
 
 /**
+ * @summary List shared organization estimate drafts
+ */
+
+export const listEstimatesResponseDraftsItemProjectJobCodeMax = 20;
+
+export const listEstimatesResponseDraftsItemProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const listEstimatesResponseDraftsItemProjectProjectNameMax = 150;
+
+export const ListEstimatesResponse = zod.object({
+  drafts: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      slug: zod.enum(["flooring", "bathroom", "basement"]),
+      version: zod.number().min(1),
+      project: zod.object({
+        sourceId: zod.string().uuid(),
+        clientSourceId: zod.string().uuid(),
+        firstName: zod.string(),
+        lastName: zod.string(),
+        phone: zod.string().optional(),
+        email: zod.string().optional(),
+        addressLine1: zod.string().optional(),
+        addressLine2: zod.string().optional(),
+        city: zod.string().optional(),
+        region: zod.string().optional(),
+        postalCode: zod.string().optional(),
+        jobCode: zod
+          .string()
+          .max(listEstimatesResponseDraftsItemProjectJobCodeMax)
+          .regex(listEstimatesResponseDraftsItemProjectJobCodeRegExp)
+          .optional(),
+        projectName: zod
+          .string()
+          .max(listEstimatesResponseDraftsItemProjectProjectNameMax),
+        salesperson: zod.string().optional(),
+        scope: zod.record(zod.string(), zod.unknown()),
+      }),
+      calculation: zod.object({
+        lines: zod.array(zod.record(zod.string(), zod.unknown())),
+        takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+        issues: zod.array(zod.string()),
+        assumptions: zod.array(zod.string()),
+      }),
+      totals: zod.object({
+        directCents: zod.number(),
+        companyCents: zod.number(),
+        incidentalsCents: zod.number(),
+        accidentsCents: zod.number(),
+        salesCents: zod.number(),
+        beforeTaxCents: zod.number(),
+      }),
+      policyVersion: zod.string(),
+      rateBookVersion: zod.string(),
+      updatedAt: zod.date(),
+      createdAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create a recalculated shared estimate draft
+ */
+export const createEstimateBodyProjectJobCodeMax = 20;
+
+export const createEstimateBodyProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const createEstimateBodyProjectProjectNameMax = 150;
+
+export const CreateEstimateBody = zod.object({
+  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(createEstimateBodyProjectJobCodeMax)
+      .regex(createEstimateBodyProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod.string().max(createEstimateBodyProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+});
+
+/**
+ * @summary Read a shared estimate draft
+ */
+export const GetEstimateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getEstimateResponseProjectJobCodeMax = 20;
+
+export const getEstimateResponseProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const getEstimateResponseProjectProjectNameMax = 150;
+
+export const GetEstimateResponse = zod.object({
+  id: zod.string().uuid(),
+  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  version: zod.number().min(1),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(getEstimateResponseProjectJobCodeMax)
+      .regex(getEstimateResponseProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod.string().max(getEstimateResponseProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+  calculation: zod.object({
+    lines: zod.array(zod.record(zod.string(), zod.unknown())),
+    takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+    issues: zod.array(zod.string()),
+    assumptions: zod.array(zod.string()),
+  }),
+  totals: zod.object({
+    directCents: zod.number(),
+    companyCents: zod.number(),
+    incidentalsCents: zod.number(),
+    accidentsCents: zod.number(),
+    salesCents: zod.number(),
+    beforeTaxCents: zod.number(),
+  }),
+  policyVersion: zod.string(),
+  rateBookVersion: zod.string(),
+  updatedAt: zod.date(),
+  createdAt: zod.date(),
+});
+
+/**
+ * @summary Compare-and-swap an estimate draft and recalculate it
+ */
+export const UpdateEstimateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const updateEstimateBodyProjectJobCodeMax = 20;
+
+export const updateEstimateBodyProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const updateEstimateBodyProjectProjectNameMax = 150;
+
+export const UpdateEstimateBody = zod.object({
+  expectedVersion: zod.number().min(1),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(updateEstimateBodyProjectJobCodeMax)
+      .regex(updateEstimateBodyProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod.string().max(updateEstimateBodyProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+});
+
+export const updateEstimateResponseProjectJobCodeMax = 20;
+
+export const updateEstimateResponseProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const updateEstimateResponseProjectProjectNameMax = 150;
+
+export const UpdateEstimateResponse = zod.object({
+  id: zod.string().uuid(),
+  slug: zod.enum(["flooring", "bathroom", "basement"]),
+  version: zod.number().min(1),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(updateEstimateResponseProjectJobCodeMax)
+      .regex(updateEstimateResponseProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod.string().max(updateEstimateResponseProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+  calculation: zod.object({
+    lines: zod.array(zod.record(zod.string(), zod.unknown())),
+    takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+    issues: zod.array(zod.string()),
+    assumptions: zod.array(zod.string()),
+  }),
+  totals: zod.object({
+    directCents: zod.number(),
+    companyCents: zod.number(),
+    incidentalsCents: zod.number(),
+    accidentsCents: zod.number(),
+    salesCents: zod.number(),
+    beforeTaxCents: zod.number(),
+  }),
+  policyVersion: zod.string(),
+  rateBookVersion: zod.string(),
+  updatedAt: zod.date(),
+  createdAt: zod.date(),
+});
+
+/**
+ * @summary Issue an immutable before-tax quote revision
+ */
+export const IssueEstimateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const IssueEstimateBody = zod.object({
+  expectedVersion: zod.number().min(1),
+});
+
+export const issueEstimateResponseProjectJobCodeMax = 20;
+
+export const issueEstimateResponseProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const issueEstimateResponseProjectProjectNameMax = 150;
+
+export const IssueEstimateResponse = zod.object({
+  id: zod.string().uuid(),
+  draftId: zod.string().uuid(),
+  revision: zod.number().min(1),
+  draftVersion: zod.number().min(1),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(issueEstimateResponseProjectJobCodeMax)
+      .regex(issueEstimateResponseProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod.string().max(issueEstimateResponseProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+  calculation: zod.object({
+    lines: zod.array(zod.record(zod.string(), zod.unknown())),
+    takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+    issues: zod.array(zod.string()),
+    assumptions: zod.array(zod.string()),
+  }),
+  totals: zod.object({
+    directCents: zod.number(),
+    companyCents: zod.number(),
+    incidentalsCents: zod.number(),
+    accidentsCents: zod.number(),
+    salesCents: zod.number(),
+    beforeTaxCents: zod.number(),
+  }),
+  policyVersion: zod.string(),
+  rateBookVersion: zod.string(),
+  issuedAt: zod.date(),
+  issuedBy: zod.string().uuid(),
+});
+
+/**
+ * @summary List immutable issued quote revisions
+ */
+export const GetEstimateRevisionsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getEstimateRevisionsResponseRevisionsItemProjectJobCodeMax = 20;
+
+export const getEstimateRevisionsResponseRevisionsItemProjectJobCodeRegExp =
+  new RegExp("^$|^[A-Za-z0-9][A-Za-z0-9-]\*$");
+export const getEstimateRevisionsResponseRevisionsItemProjectProjectNameMax = 150;
+
+export const GetEstimateRevisionsResponse = zod.object({
+  revisions: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      draftId: zod.string().uuid(),
+      revision: zod.number().min(1),
+      draftVersion: zod.number().min(1),
+      project: zod.object({
+        sourceId: zod.string().uuid(),
+        clientSourceId: zod.string().uuid(),
+        firstName: zod.string(),
+        lastName: zod.string(),
+        phone: zod.string().optional(),
+        email: zod.string().optional(),
+        addressLine1: zod.string().optional(),
+        addressLine2: zod.string().optional(),
+        city: zod.string().optional(),
+        region: zod.string().optional(),
+        postalCode: zod.string().optional(),
+        jobCode: zod
+          .string()
+          .max(getEstimateRevisionsResponseRevisionsItemProjectJobCodeMax)
+          .regex(getEstimateRevisionsResponseRevisionsItemProjectJobCodeRegExp)
+          .optional(),
+        projectName: zod
+          .string()
+          .max(getEstimateRevisionsResponseRevisionsItemProjectProjectNameMax),
+        salesperson: zod.string().optional(),
+        scope: zod.record(zod.string(), zod.unknown()),
+      }),
+      calculation: zod.object({
+        lines: zod.array(zod.record(zod.string(), zod.unknown())),
+        takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+        issues: zod.array(zod.string()),
+        assumptions: zod.array(zod.string()),
+      }),
+      totals: zod.object({
+        directCents: zod.number(),
+        companyCents: zod.number(),
+        incidentalsCents: zod.number(),
+        accidentsCents: zod.number(),
+        salesCents: zod.number(),
+        beforeTaxCents: zod.number(),
+      }),
+      policyVersion: zod.string(),
+      rateBookVersion: zod.string(),
+      issuedAt: zod.date(),
+      issuedBy: zod.string().uuid(),
+    }),
+  ),
+});
+
+/**
+ * @summary Read an immutable issued quote revision
+ */
+
+export const GetEstimateRevisionParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  revision: zod.coerce.number().min(1),
+});
+
+export const getEstimateRevisionResponseProjectJobCodeMax = 20;
+
+export const getEstimateRevisionResponseProjectJobCodeRegExp = new RegExp(
+  "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
+);
+export const getEstimateRevisionResponseProjectProjectNameMax = 150;
+
+export const GetEstimateRevisionResponse = zod.object({
+  id: zod.string().uuid(),
+  draftId: zod.string().uuid(),
+  revision: zod.number().min(1),
+  draftVersion: zod.number().min(1),
+  project: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    phone: zod.string().optional(),
+    email: zod.string().optional(),
+    addressLine1: zod.string().optional(),
+    addressLine2: zod.string().optional(),
+    city: zod.string().optional(),
+    region: zod.string().optional(),
+    postalCode: zod.string().optional(),
+    jobCode: zod
+      .string()
+      .max(getEstimateRevisionResponseProjectJobCodeMax)
+      .regex(getEstimateRevisionResponseProjectJobCodeRegExp)
+      .optional(),
+    projectName: zod
+      .string()
+      .max(getEstimateRevisionResponseProjectProjectNameMax),
+    salesperson: zod.string().optional(),
+    scope: zod.record(zod.string(), zod.unknown()),
+  }),
+  calculation: zod.object({
+    lines: zod.array(zod.record(zod.string(), zod.unknown())),
+    takeoff: zod.array(zod.record(zod.string(), zod.unknown())),
+    issues: zod.array(zod.string()),
+    assumptions: zod.array(zod.string()),
+  }),
+  totals: zod.object({
+    directCents: zod.number(),
+    companyCents: zod.number(),
+    incidentalsCents: zod.number(),
+    accidentsCents: zod.number(),
+    salesCents: zod.number(),
+    beforeTaxCents: zod.number(),
+  }),
+  policyVersion: zod.string(),
+  rateBookVersion: zod.string(),
+  issuedAt: zod.date(),
+  issuedBy: zod.string().uuid(),
+});
+
+/**
+ * @summary Read frozen identity and document JSON for exact delivery retries
+ */
+
+export const GetEstimateDeliveryParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  revision: zod.coerce.number().min(1),
+});
+
+export const getEstimateDeliveryResponseProposalJsonDocumentContentBase64Max = 11184812;
+
+export const getEstimateDeliveryResponseTakeoffJsonDocumentContentBase64Max = 11184812;
+
+export const getEstimateDeliveryResponseProposalSha256RegExp = new RegExp(
+  "^[a-f0-9]{64}$",
+);
+export const getEstimateDeliveryResponseTakeoffSha256RegExp = new RegExp(
+  "^[a-f0-9]{64}$",
+);
+
+export const GetEstimateDeliveryResponse = zod.object({
+  identityJson: zod.object({
+    sourceId: zod.string().uuid(),
+    clientSourceId: zod.string().uuid(),
+    deliveryId: zod.string().uuid(),
+    source: zod.object({
+      updatedAt: zod
+        .string()
+        .describe("ISO instant with explicit timezone offset"),
+      revision: zod.string().optional(),
+    }),
+    client: zod.object({
+      firstName: zod.string().min(1),
+      lastName: zod.string().min(1),
+      phone: zod.string().optional(),
+      email: zod.string().optional(),
+      address: zod
+        .object({
+          line1: zod.string().optional(),
+          line2: zod.string().optional(),
+          city: zod.string().optional(),
+          state: zod.string().optional(),
+          postalCode: zod.string().optional(),
+        })
+        .optional(),
+    }),
+    project: zod.object({
+      projectType: zod.string(),
+      name: zod.string(),
+      jobCode: zod.string().optional(),
+    }),
+    expectedDocuments: zod.array(zod.enum(["proposal", "takeoff"])).optional(),
+  }),
+  proposalJson: zod.object({
+    sourceId: zod.string().uuid(),
+    deliveryId: zod.string().uuid(),
+    source: zod.object({
+      updatedAt: zod
+        .string()
+        .describe("ISO instant with explicit timezone offset"),
+      revision: zod.string().optional(),
+    }),
+    document: zod.object({
+      type: zod.enum(["proposal", "takeoff"]),
+      originalName: zod.string(),
+      mime: zod.enum(["application/pdf"]),
+      sha256: zod.string(),
+      contentBase64: zod
+        .string()
+        .max(getEstimateDeliveryResponseProposalJsonDocumentContentBase64Max),
+    }),
+  }),
+  takeoffJson: zod.object({
+    sourceId: zod.string().uuid(),
+    deliveryId: zod.string().uuid(),
+    source: zod.object({
+      updatedAt: zod
+        .string()
+        .describe("ISO instant with explicit timezone offset"),
+      revision: zod.string().optional(),
+    }),
+    document: zod.object({
+      type: zod.enum(["proposal", "takeoff"]),
+      originalName: zod.string(),
+      mime: zod.enum(["application/pdf"]),
+      sha256: zod.string(),
+      contentBase64: zod
+        .string()
+        .max(getEstimateDeliveryResponseTakeoffJsonDocumentContentBase64Max),
+    }),
+  }),
+  proposalSha256: zod
+    .string()
+    .regex(getEstimateDeliveryResponseProposalSha256RegExp),
+  takeoffSha256: zod
+    .string()
+    .regex(getEstimateDeliveryResponseTakeoffSha256RegExp),
+});
+
+/**
+ * @summary Download a private frozen issued quote PDF
+ */
+
+export const GetEstimateRevisionPdfParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  revision: zod.coerce.number().min(1),
+  type: zod.enum(["proposal", "takeoff"]),
+});
+
+/**
  * @summary Check whether the server-side Ledger intake is provisioned
  */
 export const GetIntakeStatusResponse = zod.object({
@@ -59,6 +608,8 @@ export const DeliverIntakeProjectResponse = zod.object({
 /**
  * @summary Deliver one project-bound PDF to H Ledger
  */
+export const deliverIntakeDocumentBodyDocumentContentBase64Max = 11184812;
+
 export const DeliverIntakeDocumentBody = zod.object({
   sourceId: zod.string().uuid(),
   deliveryId: zod.string().uuid(),
@@ -73,7 +624,9 @@ export const DeliverIntakeDocumentBody = zod.object({
     originalName: zod.string(),
     mime: zod.enum(["application/pdf"]),
     sha256: zod.string(),
-    contentBase64: zod.string(),
+    contentBase64: zod
+      .string()
+      .max(deliverIntakeDocumentBodyDocumentContentBase64Max),
   }),
 });
 

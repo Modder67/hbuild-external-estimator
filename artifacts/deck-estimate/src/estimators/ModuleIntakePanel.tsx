@@ -106,11 +106,12 @@ function allAccepted(record: PendingIntake) {
 }
 
 export function ModuleIntakePanel<T>({
-  project, calculation, estimatorType,
+  project, calculation, estimatorType, deliveryPaused = false,
 }: {
   project: EstimatorProject<T>;
   calculation: Calculation;
   estimatorType: string;
+  deliveryPaused?: boolean;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
@@ -188,7 +189,7 @@ export function ModuleIntakePanel<T>({
   };
 
   const send = async () => {
-    if (!session || !queueKey || !configured || queueLoading) return;
+    if (!session || !queueKey || !configured || queueLoading || deliveryPaused) return;
     setError('');
     setMessage('');
     setWorking(true);
@@ -325,7 +326,9 @@ export function ModuleIntakePanel<T>({
         {session && <Button type="button" variant="ghost" size="sm" onClick={() => void auth?.auth.signOut()}>Sign out</Button>}
       </div>
       <p className="text-xs text-muted-foreground">
-        Sends a new project and proposal/takeoff PDFs through the guarded HBUILD intake API. Receipts are not verification, approval, or release. Credentials for Ledger are never stored in or sent from this browser.
+        {deliveryPaused
+          ? 'Existing browser delivery snapshots and receipt statuses are retained for recovery. Sending is paused until issued quote revisions are reconciled with HBUILD; local downloads remain available.'
+          : 'Sends a new project and proposal/takeoff PDFs through the guarded HBUILD intake API. Receipts are not verification, approval, or release. Credentials for Ledger are never stored in or sent from this browser.'}
       </p>
 
       {hasIssues && (
@@ -362,7 +365,7 @@ export function ModuleIntakePanel<T>({
         <>
           {!queue && (
             <label className="flex items-start gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} disabled={working || hasIssues} />
+               <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} disabled={working || hasIssues || deliveryPaused} />
               <span>Confirm this is a new project and these PDFs are ready for staff-only intake. This does not authorize release.</span>
             </label>
           )}
@@ -374,7 +377,7 @@ export function ModuleIntakePanel<T>({
           <Button
             type="button"
             onClick={() => void send()}
-            disabled={working || queueLoading || Boolean(queueError) || (hasIssues && !queue) || !supportedType || (!queue && !confirmed) || (Boolean(queue) && !retryOnly)}
+             disabled={deliveryPaused || working || queueLoading || Boolean(queueError) || (hasIssues && !queue) || !supportedType || (!queue && !confirmed) || (Boolean(queue) && !retryOnly)}
           >
             {working ? 'Sending…' : queueLoading ? 'Loading saved delivery…' : retryOnly ? 'Retry exact saved delivery' : queue ? 'Submitted snapshot is locked' : 'Freeze and send new project'}
           </Button>

@@ -14,7 +14,217 @@ tags:
     description: Authorized HBUILD mesh reads
   - name: intake
     description: Signed H Ledger estimator intake
+  - name: estimates
+    description: Estimator-owned drafts, issued quotes, and frozen delivery snapshots
 paths:
+  /estimates:
+    get:
+      operationId: listEstimates
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: List shared organization estimate drafts
+      responses:
+        "200":
+          description: Drafts accessible to the authenticated estimator staff member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimateDraftList" }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "503": { description: Persistence or project gateway unavailable }
+    post:
+      operationId: createEstimate
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Create a recalculated shared estimate draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstimateDraftInput" }
+      responses:
+        "201":
+          description: Created draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimateDraft" }
+        "400": { description: Invalid estimator slug or malformed project source snapshot }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "503": { description: Persistence or project gateway unavailable }
+  /estimates/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEstimate
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Read a shared estimate draft
+      responses:
+        "200":
+          description: Estimate draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimateDraft" }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Draft is not available to this user }
+        "503": { description: Persistence or project gateway unavailable }
+    put:
+      operationId: updateEstimate
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Compare-and-swap an estimate draft and recalculate it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstimateDraftUpdate" }
+      responses:
+        "200":
+          description: Updated estimate draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimateDraft" }
+        "400": { description: Invalid expected version or project snapshot }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Draft is not available to this user }
+        "409": { description: Draft changed since it was read }
+        "503": { description: Persistence or project gateway unavailable }
+  /estimates/{id}/issue:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: issueEstimate
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Issue an immutable before-tax quote revision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstimateIssueInput" }
+      responses:
+        "200":
+          description: Issued quote, idempotently returned for the same draft version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuedQuote" }
+        "400": { description: Invalid expected version }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Draft is not available to this user }
+        "409": { description: Draft changed since it was read }
+        "422": { description: "Calculation issues, missing customer identity, empty or zero scope, or oversized PDFs prevent issue" }
+        "503": { description: Persistence or private object storage unavailable }
+  /estimates/{id}/revisions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEstimateRevisions
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: List immutable issued quote revisions
+      responses:
+        "200":
+          description: Issued revisions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuedQuoteList" }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Draft is not available to this user }
+        "503": { description: Persistence or project gateway unavailable }
+  /estimates/{id}/revisions/{revision}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: revision
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      operationId: getEstimateRevision
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Read an immutable issued quote revision
+      responses:
+        "200":
+          description: Issued quote
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuedQuote" }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Quote is not available to this user }
+        "503": { description: Persistence or project gateway unavailable }
+  /estimates/{id}/revisions/{revision}/delivery:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: revision
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      operationId: getEstimateDelivery
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Read frozen identity and document JSON for exact delivery retries
+      responses:
+        "200":
+          description: Frozen delivery snapshot and private PDF integrity hashes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstimateDeliverySnapshot" }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Quote is not available to this user }
+        "503": { description: Snapshot or persistence unavailable }
+  /estimates/{id}/revisions/{revision}/pdf/{type}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: revision
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - name: type
+        in: path
+        required: true
+        schema: { type: string, enum: [proposal, takeoff] }
+    get:
+      operationId: getEstimateRevisionPdf
+      tags: [estimates]
+      security: [{ userAccessToken: [] }]
+      summary: Download a private frozen issued quote PDF
+      responses:
+        "200":
+          description: Customer-safe immutable PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { description: Invalid PDF type }
+        "401": { description: Missing or invalid user session }
+        "403": { description: Staff allowlist or organization membership denied }
+        "404": { description: Quote or PDF is not available to this user }
+        "503": { description: Private storage or integrity check unavailable }
   /intake/status:
     get:
       operationId: getIntakeStatus
@@ -168,6 +378,121 @@ components:
       type: http
       scheme: bearer
   schemas:
+    ProjectSnapshot:
+      type: object
+      additionalProperties: false
+      required: [sourceId, clientSourceId, firstName, lastName, projectName, scope]
+      properties:
+        sourceId: { type: string, format: uuid }
+        clientSourceId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        city: { type: string }
+        region: { type: string }
+        postalCode: { type: string }
+        jobCode: { type: string, maxLength: 20, pattern: "^$|^[A-Za-z0-9][A-Za-z0-9-]*$" }
+        projectName: { type: string, maxLength: 150 }
+        salesperson: { type: string }
+        scope:
+          type: object
+          additionalProperties: true
+    EstimateCalculation:
+      type: object
+      additionalProperties: true
+      required: [lines, takeoff, issues, assumptions]
+      properties:
+        lines: { type: array, items: { type: object, additionalProperties: true } }
+        takeoff: { type: array, items: { type: object, additionalProperties: true } }
+        issues: { type: array, items: { type: string } }
+        assumptions: { type: array, items: { type: string } }
+    EstimateTotals:
+      type: object
+      additionalProperties: true
+      required: [directCents, companyCents, incidentalsCents, accidentsCents, salesCents, beforeTaxCents]
+      properties:
+        directCents: { type: integer }
+        companyCents: { type: integer }
+        incidentalsCents: { type: integer }
+        accidentsCents: { type: integer }
+        salesCents: { type: integer }
+        beforeTaxCents: { type: integer }
+    EstimateDraft:
+      type: object
+      additionalProperties: false
+      required: [id, slug, version, project, calculation, totals, policyVersion, rateBookVersion, updatedAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, enum: [flooring, bathroom, basement] }
+        version: { type: integer, minimum: 1 }
+        project: { $ref: "#/components/schemas/ProjectSnapshot" }
+        calculation: { $ref: "#/components/schemas/EstimateCalculation" }
+        totals: { $ref: "#/components/schemas/EstimateTotals" }
+        policyVersion: { type: string }
+        rateBookVersion: { type: string }
+        updatedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    IssuedQuote:
+      type: object
+      additionalProperties: false
+      required: [id, draftId, revision, draftVersion, project, calculation, totals, policyVersion, rateBookVersion, issuedAt, issuedBy]
+      properties:
+        id: { type: string, format: uuid }
+        draftId: { type: string, format: uuid }
+        revision: { type: integer, minimum: 1 }
+        draftVersion: { type: integer, minimum: 1 }
+        project: { $ref: "#/components/schemas/ProjectSnapshot" }
+        calculation: { $ref: "#/components/schemas/EstimateCalculation" }
+        totals: { $ref: "#/components/schemas/EstimateTotals" }
+        policyVersion: { type: string }
+        rateBookVersion: { type: string }
+        issuedAt: { type: string, format: date-time }
+        issuedBy: { type: string, format: uuid }
+    EstimateDraftInput:
+      type: object
+      additionalProperties: false
+      required: [slug, project]
+      properties:
+        slug: { type: string, enum: [flooring, bathroom, basement] }
+        project: { $ref: "#/components/schemas/ProjectSnapshot" }
+    EstimateDraftUpdate:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, project]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        project: { $ref: "#/components/schemas/ProjectSnapshot" }
+    EstimateIssueInput:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+    EstimateDraftList:
+      type: object
+      additionalProperties: false
+      required: [drafts]
+      properties:
+        drafts: { type: array, items: { $ref: "#/components/schemas/EstimateDraft" } }
+    IssuedQuoteList:
+      type: object
+      additionalProperties: false
+      required: [revisions]
+      properties:
+        revisions: { type: array, items: { $ref: "#/components/schemas/IssuedQuote" } }
+    EstimateDeliverySnapshot:
+      type: object
+      additionalProperties: false
+      required: [identityJson, proposalJson, takeoffJson, proposalSha256, takeoffSha256]
+      properties:
+        identityJson: { $ref: "#/components/schemas/EstimatorProjectDelivery" }
+        proposalJson: { $ref: "#/components/schemas/EstimatorDocumentDelivery" }
+        takeoffJson: { $ref: "#/components/schemas/EstimatorDocumentDelivery" }
+        proposalSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        takeoffSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
     IntakeStatus:
       type: object
       required: [configured]
@@ -234,7 +559,7 @@ components:
             originalName: { type: string }
             mime: { type: string, enum: [application/pdf] }
             sha256: { type: string }
-            contentBase64: { type: string }
+            contentBase64: { type: string, maxLength: 11184812 }
     MeshProject:
       type: object
       additionalProperties: false

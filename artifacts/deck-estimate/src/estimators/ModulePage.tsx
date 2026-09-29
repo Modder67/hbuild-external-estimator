@@ -7,6 +7,7 @@ import { modulePdf, moduleSpreadsheet } from './exports';
 import { newProject, useProjectDraft, type EstimatorProject } from './project';
 import { money, POLICY, totals, uniqueLines, type Calculation } from './types';
 import { ModuleIntakePanel, hasPendingIntakeForProject } from './ModuleIntakePanel';
+import { SharedDraftPanel } from './SharedDraftPanel';
 
 type EditorProps<T> = { value: T; onChange: (next: T) => void };
 
@@ -20,7 +21,8 @@ export function ModulePage<T>({
   calculate: (scope: T) => Calculation;
   Editor: ComponentType<EditorProps<T>>;
 }) {
-  const { draft, setDraft, saveError, reset } = useProjectDraft(slug, () => newProject(title, createScope()));
+  const { draft, setDraft, saveError, reset, adoptProject, restoreLocal, localDrafts } =
+    useProjectDraft(slug, () => newProject(title, createScope()));
   const result = useMemo(() => uniqueLines(calculate(draft.scope)), [calculate, draft.scope]);
   const summary = useMemo(() => totals(result), [result]);
   const [exportError, setExportError] = useState('');
@@ -48,7 +50,7 @@ export function ModulePage<T>({
                 setResetError('A saved HBUILD delivery belongs to this job. New job is blocked until Ledger readback can be reconciled; keep the original draft and PDFs.');
                 return;
               }
-              if (window.confirm('Start a new local job? The current form will be replaced. Save downloads first.')) {
+              if (window.confirm('Start a new local job? The current job will be preserved in this browser’s local draft history.')) {
                 reset();
                 setResetError('');
               }
@@ -133,7 +135,15 @@ export function ModulePage<T>({
               </div>
               {exportError && <p className="text-destructive text-sm" role="alert">{exportError}</p>}
             </section>
-            <ModuleIntakePanel project={draft} calculation={result} estimatorType={title} />
+            <SharedDraftPanel
+              slug={slug}
+              project={draft}
+              calculation={result}
+              localDrafts={localDrafts}
+              onLoadProject={adoptProject}
+              onLoadLocalProject={restoreLocal}
+            />
+            <ModuleIntakePanel project={draft} calculation={result} estimatorType={title} deliveryPaused />
           </div>
           <aside className="lg:sticky lg:top-6 lg:self-start rounded-xl border border-primary/25 bg-card p-5 space-y-3">
             <h2 className="font-semibold">Known-cost summary</h2>

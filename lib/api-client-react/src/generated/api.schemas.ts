@@ -5,21 +5,123 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface IntakeStatus {
-  configured: boolean;
+export type ProjectSnapshotScope = { [key: string]: unknown };
+
+export interface ProjectSnapshot {
+  sourceId: string;
+  clientSourceId: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  /**
+   * @maxLength 20
+   * @pattern ^$|^[A-Za-z0-9][A-Za-z0-9-]*$
+   */
+  jobCode?: string;
+  /** @maxLength 150 */
+  projectName: string;
+  salesperson?: string;
+  scope: ProjectSnapshotScope;
 }
 
-export type IntakeReceiptOutcome =
-  (typeof IntakeReceiptOutcome)[keyof typeof IntakeReceiptOutcome];
+export type EstimateCalculationLinesItem = { [key: string]: unknown };
 
-export const IntakeReceiptOutcome = {
-  applied: "applied",
-  stale: "stale",
+export type EstimateCalculationTakeoffItem = { [key: string]: unknown };
+
+export interface EstimateCalculation {
+  lines: EstimateCalculationLinesItem[];
+  takeoff: EstimateCalculationTakeoffItem[];
+  issues: string[];
+  assumptions: string[];
+  [key: string]: unknown;
+}
+
+export interface EstimateTotals {
+  directCents: number;
+  companyCents: number;
+  incidentalsCents: number;
+  accidentsCents: number;
+  salesCents: number;
+  beforeTaxCents: number;
+  [key: string]: unknown;
+}
+
+export type EstimateDraftSlug =
+  (typeof EstimateDraftSlug)[keyof typeof EstimateDraftSlug];
+
+export const EstimateDraftSlug = {
+  flooring: "flooring",
+  bathroom: "bathroom",
+  basement: "basement",
 } as const;
 
-export interface IntakeReceipt {
-  outcome: IntakeReceiptOutcome;
-  detail?: string;
+export interface EstimateDraft {
+  id: string;
+  slug: EstimateDraftSlug;
+  /** @minimum 1 */
+  version: number;
+  project: ProjectSnapshot;
+  calculation: EstimateCalculation;
+  totals: EstimateTotals;
+  policyVersion: string;
+  rateBookVersion: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface IssuedQuote {
+  id: string;
+  draftId: string;
+  /** @minimum 1 */
+  revision: number;
+  /** @minimum 1 */
+  draftVersion: number;
+  project: ProjectSnapshot;
+  calculation: EstimateCalculation;
+  totals: EstimateTotals;
+  policyVersion: string;
+  rateBookVersion: string;
+  issuedAt: string;
+  issuedBy: string;
+}
+
+export type EstimateDraftInputSlug =
+  (typeof EstimateDraftInputSlug)[keyof typeof EstimateDraftInputSlug];
+
+export const EstimateDraftInputSlug = {
+  flooring: "flooring",
+  bathroom: "bathroom",
+  basement: "basement",
+} as const;
+
+export interface EstimateDraftInput {
+  slug: EstimateDraftInputSlug;
+  project: ProjectSnapshot;
+}
+
+export interface EstimateDraftUpdate {
+  /** @minimum 1 */
+  expectedVersion: number;
+  project: ProjectSnapshot;
+}
+
+export interface EstimateIssueInput {
+  /** @minimum 1 */
+  expectedVersion: number;
+}
+
+export interface EstimateDraftList {
+  drafts: EstimateDraft[];
+}
+
+export interface IssuedQuoteList {
+  revisions: IssuedQuote[];
 }
 
 export interface IntakeSource {
@@ -27,6 +129,14 @@ export interface IntakeSource {
   updatedAt: string;
   revision?: string;
 }
+
+export type EstimatorProjectDeliveryExpectedDocumentsItem =
+  (typeof EstimatorProjectDeliveryExpectedDocumentsItem)[keyof typeof EstimatorProjectDeliveryExpectedDocumentsItem];
+
+export const EstimatorProjectDeliveryExpectedDocumentsItem = {
+  proposal: "proposal",
+  takeoff: "takeoff",
+} as const;
 
 export type EstimatorProjectDeliveryClientAddress = {
   line1?: string;
@@ -51,14 +161,6 @@ export type EstimatorProjectDeliveryProject = {
   name: string;
   jobCode?: string;
 };
-
-export type EstimatorProjectDeliveryExpectedDocumentsItem =
-  (typeof EstimatorProjectDeliveryExpectedDocumentsItem)[keyof typeof EstimatorProjectDeliveryExpectedDocumentsItem];
-
-export const EstimatorProjectDeliveryExpectedDocumentsItem = {
-  proposal: "proposal",
-  takeoff: "takeoff",
-} as const;
 
 export interface EstimatorProjectDelivery {
   sourceId: string;
@@ -90,6 +192,7 @@ export type EstimatorDocumentDeliveryDocument = {
   originalName: string;
   mime: EstimatorDocumentDeliveryDocumentMime;
   sha256: string;
+  /** @maxLength 11184812 */
   contentBase64: string;
 };
 
@@ -98,6 +201,33 @@ export interface EstimatorDocumentDelivery {
   deliveryId: string;
   source: IntakeSource;
   document: EstimatorDocumentDeliveryDocument;
+}
+
+export interface EstimateDeliverySnapshot {
+  identityJson: EstimatorProjectDelivery;
+  proposalJson: EstimatorDocumentDelivery;
+  takeoffJson: EstimatorDocumentDelivery;
+  /** @pattern ^[a-f0-9]{64}$ */
+  proposalSha256: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  takeoffSha256: string;
+}
+
+export interface IntakeStatus {
+  configured: boolean;
+}
+
+export type IntakeReceiptOutcome =
+  (typeof IntakeReceiptOutcome)[keyof typeof IntakeReceiptOutcome];
+
+export const IntakeReceiptOutcome = {
+  applied: "applied",
+  stale: "stale",
+} as const;
+
+export interface IntakeReceipt {
+  outcome: IntakeReceiptOutcome;
+  detail?: string;
 }
 
 export interface MeshProject {

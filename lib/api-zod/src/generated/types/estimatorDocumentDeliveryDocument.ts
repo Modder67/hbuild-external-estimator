@@ -13,5 +13,6 @@ export type EstimatorDocumentDeliveryDocument = {
   originalName: string;
   mime: EstimatorDocumentDeliveryDocumentMime;
   sha256: string;
+  /** @maxLength 11184812 */
   contentBase64: string;
 };

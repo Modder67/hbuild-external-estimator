@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { DeliverIntakeProjectBody, DeliverIntakeDocumentBody } from "@workspace/api-zod";
+import { db, estimateDeliveriesTable, estimateDraftsTable, issuedQuotesTable } from "@workspace/db";
 import { allowedProjects, gatewayConfig, verifiedUser } from "./mesh";
 
 const router: IRouter = Router();
@@ -41,7 +43,51 @@ async function authorized(req: Request) {
   if (!intake.staffIds.includes(userId)) return { status: 403, error: "Your account is not approved for H Ledger intake." } as const;
   const grants = await allowedProjects(mesh, userId);
   if ("error" in grants) return { status: grants.status, error: grants.error } as const;
-  return { userId, intake } as const;
+  return { userId, orgId: mesh.orgId, intake } as const;
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
+async function issuedDeliverySnapshots(orgId: string, sourceId: string) {
+  return db.select({
+    identityJson: estimateDeliveriesTable.identityJson,
+    proposalJson: estimateDeliveriesTable.proposalJson,
+    takeoffJson: estimateDeliveriesTable.takeoffJson,
+    proposalSha256: estimateDeliveriesTable.proposalSha256,
+    takeoffSha256: estimateDeliveriesTable.takeoffSha256,
+  }).from(estimateDraftsTable)
+    .innerJoin(issuedQuotesTable, eq(issuedQuotesTable.draftId, estimateDraftsTable.id))
+    .innerJoin(estimateDeliveriesTable, eq(estimateDeliveriesTable.quoteId, issuedQuotesTable.id))
+    .where(and(
+      eq(estimateDraftsTable.orgId, orgId),
+      eq(estimateDraftsTable.sourceId, sourceId),
+    ));
+}
+
+function matchesFrozenIdentity(identityJson: unknown, request: unknown) {
+  return stableJson(identityJson) === stableJson(request);
+}
+
+function matchesFrozenDocument(
+  rows: Awaited<ReturnType<typeof issuedDeliverySnapshots>>,
+  type: "proposal" | "takeoff",
+  request: unknown,
+) {
+  const document = (request as { document?: { sha256?: unknown } } | null)?.document;
+  if (!document || typeof document.sha256 !== "string") return false;
+  return rows.some(row => {
+    const envelope = type === "proposal" ? row.proposalJson : row.takeoffJson;
+    const expectedHash = type === "proposal" ? row.proposalSha256 : row.takeoffSha256;
+    return expectedHash === document.sha256 &&
+      matchesFrozenIdentity(envelope, request);
+  });
 }
 
 async function deliver(
@@ -105,6 +151,10 @@ router.post("/projects", async (req, res): Promise<void> => {
   try {
     const auth = await authorized(req);
     if ("error" in auth) { res.status(auth.status ?? 503).json({ error: auth.error }); return; }
+    const snapshots = await issuedDeliverySnapshots(auth.orgId, sourceId);
+    if (!snapshots.some(row => matchesFrozenIdentity(row.identityJson, req.body))) {
+      res.status(409).json({ error: "Only the exact identity snapshot from an immutable issued estimate can be delivered." }); return;
+    }
     const payload = {
       source,
       client: {
@@ -153,6 +203,13 @@ router.post("/documents", async (req, res): Promise<void> => {
   try {
     const auth = await authorized(req);
     if ("error" in auth) { res.status(auth.status ?? 503).json({ error: auth.error }); return; }
+    const snapshots = await issuedDeliverySnapshots(auth.orgId, sourceId);
+    const documentMetadata = { ...req.body.document };
+    delete documentMetadata.contentBase64;
+    const frozenRequest = { ...req.body, document: documentMetadata };
+    if (!matchesFrozenDocument(snapshots, document.type, frozenRequest)) {
+      res.status(409).json({ error: "Only the exact PDF from an immutable issued estimate can be delivered." }); return;
+    }
     const payload = {
       source,
       project: { externalId: `deck-estimate:project:${sourceId}` },

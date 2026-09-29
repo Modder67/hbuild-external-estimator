@@ -1,2 +1,3 @@
 - [Hdocs file storage](hdocs-storage-decision.md) — owner chose private Supabase Storage for PDFs; preserve Hdocs ownership and worker-mediated access.
 - [Estimator intake authority](estimator-intake-authority.md) — new jobs originate in this estimator and enter HBUILD through Ledger, not a picker of existing projects.
+- [Generated API date-time validation](api-codegen-dates.md) — validate Date values before JSON serialization; ISO strings can fail post-write response validation.
