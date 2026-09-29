@@ -23,19 +23,21 @@ async function pdfPayload(blob: Blob, type: 'proposal' | 'takeoff', originalName
   return { type, originalName, mime: 'application/pdf' as const, sha256, contentBase64 };
 }
 
-async function sendDelivery(path: string, body: string, token: string) {
-  const response = await fetch(`/api/intake/${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
-    body,
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'H Ledger did not accept this delivery.');
-  if (!['applied', 'stale'].includes(result.outcome)) throw new Error('H Ledger returned an unknown receipt.');
-}
-
-function allDone(record: PendingIntake) {
-  return record.identityDone && record.proposalDone && (record.takeoffDone || record.takeoffJson === null);
+function downloadFrozenPdf(json: string | null, fallbackName: string) {
+  if (!json) return;
+  const payload = JSON.parse(json) as {
+    document?: { contentBase64?: string; originalName?: string; mime?: string };
+  };
+  const document = payload.document;
+  if (!document?.contentBase64) throw new Error('The saved PDF bytes are unavailable in this local snapshot.');
+  const binary = atob(document.contentBase64);
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: document.mime || 'application/pdf' }));
+  const anchor = window.document.createElement('a');
+  anchor.href = url;
+  anchor.download = document.originalName || fallbackName;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export function LedgerIntakePanel({
@@ -48,16 +50,14 @@ export function LedgerIntakePanel({
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [configured, setConfigured] = useState<boolean | null>(null);
   const [queue, setQueue] = useState<PendingIntake | null>(null);
+  const [loadingQueue, setLoadingQueue] = useState(false);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const queueKey = session && state.sourceId ? `${session.user.id}:${state.sourceId}` : null;
 
   useEffect(() => {
-    fetch('/api/intake/status').then(r => r.json()).then(r => setConfigured(r.configured === true))
-      .catch(() => setConfigured(false));
     if (!auth) return;
     void auth.auth.getSession().then(({ data }) => setSession(data.session)).catch(() => setSession(null));
     const { data: { subscription } } = auth.auth.onAuthStateChange((_event, next) => {
@@ -71,10 +71,17 @@ export function LedgerIntakePanel({
   useEffect(() => {
     let current = true;
     setQueue(null);
+    setLoadingQueue(Boolean(queueKey));
     if (queueKey) void loadIntake(queueKey).then(record => {
-      if (current) setQueue(record ?? null);
+      if (current) {
+        setQueue(record ?? null);
+        setLoadingQueue(false);
+      }
     }).catch(() => {
-      if (current) setError('Local delivery queue is unavailable. Do not send until browser storage works.');
+      if (current) {
+        setLoadingQueue(false);
+        setError('Local delivery storage is unavailable. The saved snapshot could not be loaded.');
+      }
     });
     return () => { current = false; };
   }, [queueKey]);
@@ -95,108 +102,84 @@ export function LedgerIntakePanel({
     }
   };
 
-  const send = async () => {
-    if (!session || !queueKey || !state.sourceId || !configured || state.projectId) return;
+  const preserveLocally = async () => {
+    if (!session || !queueKey || !state.sourceId || state.projectId) return;
     setError('');
     setMessage('');
     setWorking(true);
     try {
       const { jobDetails: job } = state;
-      let record = await loadIntake(queueKey);
+      const record = await loadIntake(queueKey);
       const fingerprint = JSON.stringify(state);
-      if (record && allDone(record) && record.fingerprint === fingerprint) {
-        setMessage('This snapshot was already submitted. Check H Ledger and H Docs for verification.');
+      if (record && record.fingerprint === fingerprint) {
+        setMessage('This exact frozen snapshot is already saved locally. Its existing receipt status has been preserved; no network delivery was attempted.');
         setQueue(record);
         return;
       }
-      if (record && allDone(record) && record.fingerprint !== fingerprint)
-        throw new Error('Earlier PDF deliveries have receipts but H Docs readback is unconfirmed. Keep their saved bytes and confirm verification before sending a revision.');
-      if (!record || allDone(record)) {
-        if (!job.firstName?.trim() || !job.lastName?.trim() || !job.jobTitle.trim())
-          throw new Error('Enter the client first and last name and a project name.');
-        if (!state.clientSourceId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.clientSourceId) ||
-            state.clientSourceId === state.sourceId)
-          throw new Error('Enter a valid, distinct estimator client ID.');
-        if (job.jobCode && !/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/.test(job.jobCode))
-          throw new Error('Job code must be at most 20 letters, digits, or hyphens.');
-        const source = { updatedAt: new Date().toISOString() };
-        const estimate = await generateEstimatePDF(state, pricing, { download: false });
-        const hasLumber = Object.values(pricing.lumber).some(value =>
-          value && typeof value === 'object' && 'qty' in value && value.qty > 0);
-        const takeoff = hasLumber ? await generateLumberTakeoffPDF(state, pricing, { download: false }) : null;
-        const address = {
-          line1: job.addressLine1?.trim() || undefined,
-          line2: job.addressLine2?.trim() || undefined,
-          city: job.city?.trim() || undefined,
-          state: job.region?.trim() || undefined,
-          postalCode: job.postalCode?.trim() || undefined,
-        };
-        record = {
-          key: queueKey,
-          fingerprint,
-          identityJson: JSON.stringify({
-            sourceId: state.sourceId,
-            clientSourceId: state.clientSourceId,
-            deliveryId: crypto.randomUUID(),
-            source,
-            client: {
-              firstName: job.firstName.trim(),
-              lastName: job.lastName.trim(),
-              ...(Object.values(address).some(Boolean) ? { address } : {}),
-            },
-            project: {
-              projectType: 'Deck',
-              name: job.jobTitle.trim(),
-              ...(job.jobCode ? { jobCode: job.jobCode } : {}),
-            },
-            expectedDocuments: ['proposal', 'takeoff'],
-          }),
-          proposalJson: JSON.stringify({
-            sourceId: state.sourceId,
-            deliveryId: crypto.randomUUID(),
-            source,
-            document: await pdfPayload(estimate.blob, 'proposal', estimate.filename),
-          }),
-          takeoffJson: takeoff ? JSON.stringify({
-            sourceId: state.sourceId,
-            deliveryId: crypto.randomUUID(),
-            source,
-            document: await pdfPayload(takeoff.blob, 'takeoff', takeoff.filename),
-          }) : null,
-          identityDone: false,
-          proposalDone: false,
-          takeoffDone: false,
-        };
-        // Commit all immutable payloads before the first network write. Retries reuse these bytes and IDs.
-        await saveIntake(record);
-      }
-      setQueue({ ...record });
-      if (record.fingerprint !== fingerprint && !allDone(record))
-        setMessage('Retrying the earlier saved snapshot first. Current edits are not part of this delivery.');
-      const token = session.access_token;
-      if (!record.identityDone) {
-        await sendDelivery('projects', record.identityJson, token);
-        record.identityDone = true;
-        await saveIntake(record);
-        setQueue({ ...record });
-      }
-      if (!record.proposalDone) {
-        await sendDelivery('documents', record.proposalJson, token);
-        record.proposalDone = true;
-        await saveIntake(record);
-        setQueue({ ...record });
-      }
-      if (record.takeoffJson && !record.takeoffDone) {
-        await sendDelivery('documents', record.takeoffJson, token);
-        record.takeoffDone = true;
-        await saveIntake(record);
-        setQueue({ ...record });
-      }
-      setMessage(record.takeoffJson
-        ? 'Both PDF receipts accepted by H Ledger. H Docs readback is unconfirmed; nothing has been released.'
-        : 'Proposal receipt accepted. Takeoff is still missing; H Docs readback is unconfirmed.');
+      if (record)
+        throw new Error('A different frozen snapshot is already saved for this estimate. Its bytes and receipt status were left untouched; this panel cannot replace it or create a revision.');
+      if (!job.firstName?.trim() || !job.lastName?.trim() || !job.jobTitle.trim())
+        throw new Error('Enter the client first and last name and a project name.');
+      if (!state.clientSourceId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.clientSourceId) ||
+          state.clientSourceId === state.sourceId)
+        throw new Error('Enter a valid, distinct estimator client ID.');
+      if (job.jobCode && !/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/.test(job.jobCode))
+        throw new Error('Job code must be at most 20 letters, digits, or hyphens.');
+      const source = { updatedAt: new Date().toISOString() };
+      const estimate = await generateEstimatePDF(state, pricing, { download: false });
+      const hasLumber = Object.values(pricing.lumber).some(value =>
+        value && typeof value === 'object' && 'qty' in value && value.qty > 0);
+      const takeoff = hasLumber ? await generateLumberTakeoffPDF(state, pricing, { download: false }) : null;
+      const address = {
+        line1: job.addressLine1?.trim() || undefined,
+        line2: job.addressLine2?.trim() || undefined,
+        city: job.city?.trim() || undefined,
+        state: job.region?.trim() || undefined,
+        postalCode: job.postalCode?.trim() || undefined,
+      };
+      const frozenRecord: PendingIntake = {
+        key: queueKey,
+        fingerprint,
+        identityJson: JSON.stringify({
+          sourceId: state.sourceId,
+          clientSourceId: state.clientSourceId,
+          deliveryId: crypto.randomUUID(),
+          source,
+          client: {
+            firstName: job.firstName.trim(),
+            lastName: job.lastName.trim(),
+            ...(Object.values(address).some(Boolean) ? { address } : {}),
+          },
+          project: {
+            projectType: 'Deck',
+            name: job.jobTitle.trim(),
+            ...(job.jobCode ? { jobCode: job.jobCode } : {}),
+          },
+          expectedDocuments: ['proposal', 'takeoff'],
+        }),
+        proposalJson: JSON.stringify({
+          sourceId: state.sourceId,
+          deliveryId: crypto.randomUUID(),
+          source,
+          document: await pdfPayload(estimate.blob, 'proposal', estimate.filename),
+        }),
+        takeoffJson: takeoff ? JSON.stringify({
+          sourceId: state.sourceId,
+          deliveryId: crypto.randomUUID(),
+          source,
+          document: await pdfPayload(takeoff.blob, 'takeoff', takeoff.filename),
+        }) : null,
+        identityDone: false,
+        proposalDone: false,
+        takeoffDone: false,
+      };
+      // This frozen local record is for preservation and recovery only. Deck cannot submit it.
+      await saveIntake(frozenRecord);
+      const saved = frozenRecord;
+      setQueue({ ...saved });
+      setMessage('A frozen Deck snapshot was saved in this browser for recovery only. It was not sent, and no later delivery is promised.');
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Delivery failed. Retry this saved snapshot.');
+      setError(failure instanceof Error ? failure.message : 'Could not save this local snapshot.');
     } finally {
       setWorking(false);
     }
@@ -208,10 +191,12 @@ export function LedgerIntakePanel({
         <strong className="text-sm">HBUILD intake</strong>
         {session && <Button type="button" variant="ghost" size="sm" onClick={() => void auth?.auth.signOut()}>Sign out</Button>}
       </div>
-      <p className="text-xs text-muted-foreground">New jobs are sent to H Ledger. H Ledger provisions the canonical project and H Docs folders. Uploads start staff-only; a receipt is not a release or verification.</p>
+      <p className="text-sm text-amber-400" role="status">
+        Deck import is not ready. The API accepts only the exact snapshot of a server-issued immutable quote revision, and Deck has no server-issued-revision flow. This remains true even if the intake status endpoint reports configured. This panel will not submit a legacy browser-generated identity or PDF.
+      </p>
       {!state.projectId && (
         <div className="space-y-1">
-          <label htmlFor="client-source-id" className="text-xs text-muted-foreground">Estimator client ID (reuse the exact ID for a returning client; never match by name)</label>
+          <label htmlFor="client-source-id" className="text-xs text-muted-foreground">Local client reference ID (reuse the exact ID for a returning client; never match by name)</label>
           <Input id="client-source-id" value={state.clientSourceId ?? ''} onChange={e => onClientSourceIdChange(e.target.value)}
             disabled={Boolean(queue)} className="font-mono text-xs" />
         </div>
@@ -219,12 +204,10 @@ export function LedgerIntakePanel({
       {state.projectId ? (
         <p className="text-sm text-amber-400" role="alert">
           This saved estimate was linked to an existing HBUILD project ({state.projectName || state.projectId}).
-          Download a copy if needed, then use Clear to start a new job before importing. It will not be sent as a duplicate.
+          Do not submit it as a duplicate. Download a copy if needed; use Clear only to start a separate estimate. Deck import is not available from this panel.
         </p>
-      ) : !auth || configured === false ? (
-        <p className="text-sm text-amber-400" role="status">H Ledger intake is not provisioned here yet. PDF and Excel downloads remain available.</p>
-      ) : configured === null ? (
-        <p className="text-sm text-muted-foreground" role="status">Checking H Ledger connection…</p>
+      ) : !auth ? (
+        <p className="text-sm text-amber-400" role="status">Local snapshot storage requires estimator sign-in, which is unavailable here. PDF and Excel downloads remain available.</p>
       ) : !session ? (
         <form onSubmit={signIn} className="flex flex-col sm:flex-row gap-2">
           <Input type="email" autoComplete="username" aria-label="HBUILD email" placeholder="HBUILD email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -233,19 +216,31 @@ export function LedgerIntakePanel({
         </form>
       ) : (
         <>
-          <Button type="button" onClick={() => void send()} disabled={working}>
-            {working ? 'Sending…' : queue && !allDone(queue) ? 'Retry saved delivery' : queue ? 'Review submitted snapshot' : 'Send new job and PDFs to HBUILD'}
+          <Button type="button" onClick={() => void preserveLocally()} disabled={working || loadingQueue || Boolean(queue)}>
+            {working ? 'Saving local snapshot…' : loadingQueue ? 'Loading saved snapshot…' : queue ? 'Frozen snapshot saved locally' : 'Save frozen local snapshot'}
           </Button>
           <div className="text-xs text-muted-foreground space-y-1" role="status">
-            <p>Client and project: {queue?.identityDone ? 'Ledger receipt accepted; mapping review needed' : 'Not delivered'}</p>
-            <p>Estimate PDF: {queue?.proposalDone ? 'Ledger receipt accepted; H Docs readback unconfirmed' : 'Not delivered'}</p>
-            <p>Takeoff PDF: {queue?.takeoffDone ? 'Ledger receipt accepted; H Docs readback unconfirmed' : queue?.takeoffJson ? 'Pending delivery' : 'Missing until lumber is selected'}</p>
+            <p>Client and project: {queue?.identityDone ? 'Previously accepted Ledger receipt; preserved unchanged' : queue ? 'Saved locally only; not delivered' : 'No saved snapshot'}</p>
+            <p>Estimate PDF: {queue?.proposalDone ? 'Previously accepted Ledger receipt; readback unconfirmed' : queue ? 'Saved locally only; not delivered' : 'No saved snapshot'}</p>
+            <p>Takeoff PDF: {queue?.takeoffDone ? 'Previously accepted Ledger receipt; readback unconfirmed' : queue?.takeoffJson ? 'Saved locally only; not delivered' : 'Missing until lumber is selected'}</p>
           </div>
+          {queue && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => {
+                try { downloadFrozenPdf(queue.proposalJson, 'deck-estimate.pdf'); }
+                catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not recover the saved proposal PDF.'); }
+              }}>Download saved proposal PDF</Button>
+              {queue.takeoffJson && <Button type="button" variant="outline" size="sm" onClick={() => {
+                try { downloadFrozenPdf(queue.takeoffJson, 'deck-takeoff.pdf'); }
+                catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not recover the saved takeoff PDF.'); }
+              }}>Download saved takeoff PDF</Button>}
+            </div>
+          )}
         </>
       )}
       {message && <p className="text-sm text-amber-200" role="status">{message}</p>}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <p className="text-xs text-muted-foreground">Pending PDF bytes are kept in this browser for manual retry. Clearing browser storage removes unsent deliveries; keep your local downloads until HBUILD verifies them.</p>
+      <p className="text-xs text-muted-foreground">Saved PDF bytes remain in this browser and can be downloaded for recovery. Clearing browser storage removes the local copy. Do not treat this frozen snapshot as queued for future HBUILD delivery; a Deck resume requires a server-issued immutable quote revision and an explicit delivery contract.</p>
     </div>
   );
 }

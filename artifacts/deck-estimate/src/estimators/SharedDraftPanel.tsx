@@ -3,6 +3,33 @@ import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { estimatorAuth } from '@/lib/supabaseAuth';
+import {
+  loadAllIntakeRecords,
+  resumePausedIssuedQuoteDelivery,
+  saveIssuedQuoteDelivery,
+  type IssuedQuoteDelivery,
+} from '@/lib/intakeQueue';
+import {
+  buildIssuedQuoteDelivery,
+  decideIntakeResponse,
+  deliveriesForConnection,
+  intakePauseFromStatus,
+  intakeIsConfigured,
+  isIssuedQuoteDelivery,
+  isQuoteQueueConnectionRecord,
+  latestRetryDeadline,
+  markDeliverySent,
+  nextPendingDelivery,
+  pendingDeliveryCount,
+  persistQuoteQueueConnection,
+  persistIssuedQuoteDelivery,
+  planManualSync,
+  retryDeadlineExpired,
+  transitionAfterResponse,
+  type QuoteQueueConnection,
+  withExclusiveQuoteSender,
+} from '@/lib/issuedQuoteQueue';
+import { IssuedQuoteQueuePanel } from './IssuedQuoteQueuePanel';
 import type { EstimatorProject } from './project';
 import { money, totals, type Calculation } from './types';
 
@@ -117,6 +144,14 @@ export function SharedDraftPanel<T>({
   const [revisionError, setRevisionError] = useState('');
   const [delivery, setDelivery] = useState<DeliveryMetadata | null>(null);
   const [conflictDraftId, setConflictDraftId] = useState('');
+  const [quoteQueue, setQuoteQueue] = useState<IssuedQuoteDelivery[]>([]);
+  const [queueConnection, setQueueConnection] = useState<QuoteQueueConnection>({ paused: false });
+  const [queueLoadingError, setQueueLoadingError] = useState('');
+  const [syncWorking, setSyncWorking] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  const [intakeConfigured, setIntakeConfigured] = useState<boolean | null>(null);
+  const [serverPause, setServerPause] = useState<QuoteQueueConnection>({ paused: false });
+  const queueOwnerRef = useRef('');
   const sourceIdRef = useRef(project.sourceId);
   sourceIdRef.current = project.sourceId;
 
@@ -139,6 +174,14 @@ export function SharedDraftPanel<T>({
       setDelivery(null);
       setConflictDraftId('');
       setRevisionError('');
+      if (!next || next.user.id !== queueOwnerRef.current) {
+        setQuoteQueue([]);
+        setQueueConnection({ paused: false });
+        setQueueLoadingError('');
+        setSyncMessage('');
+        setIntakeConfigured(null);
+        setServerPause({ paused: false });
+      }
       setError('');
       setNotice('');
       setLoading(Boolean(next));
@@ -147,6 +190,52 @@ export function SharedDraftPanel<T>({
       current = false;
       subscription.unsubscribe();
     };
+  }, []);
+
+  const reloadQuoteQueue = useCallback(async (userId: string) => {
+    try {
+      const records = await loadAllIntakeRecords();
+      let owned = deliveriesForConnection(records, userId);
+      for (const record of owned) {
+        const sourceKey = `${userId}:${record.sourceId}`;
+        if (record.sourceKey !== sourceKey) {
+          await saveIssuedQuoteDelivery({ ...record, sourceKey });
+        }
+      }
+      if (owned.some(record => record.sourceKey !== `${userId}:${record.sourceId}`)) {
+        const updated = await loadAllIntakeRecords();
+        owned = updated.filter(isIssuedQuoteDelivery).filter(record => record.userId === userId);
+      }
+      setQuoteQueue(owned);
+      const pauseMarkers = records.filter(isQuoteQueueConnectionRecord)
+        .filter(record => record.userId === userId && record.paused);
+      const paused = owned.some(record => record.state === 'paused');
+      const retryAt = latestRetryDeadline([
+        ...pauseMarkers.map(record => record.retryAt),
+        ...owned.filter(record => record.state === 'paused').map(record => record.retryAt),
+      ]);
+      setQueueConnection(paused
+        ? { paused: true, reason: 'estimator_sync_disabled', retryAt }
+        : pauseMarkers.length > 0 ? { paused: true, reason: 'estimator_sync_disabled', retryAt }
+        : { paused: false });
+      setQueueLoadingError('');
+    } catch {
+      setQuoteQueue([]);
+      setQueueConnection({ paused: false });
+      setQueueLoadingError('Browser delivery storage is unavailable. Issued quote snapshots will not be sent until durable storage is available.');
+    }
+    queueOwnerRef.current = userId;
+  }, []);
+
+  const refreshIntakeProvisioning = useCallback(async () => {
+    const response = await fetch('/api/intake/status');
+    if (!response.ok) throw new Error(`Could not check HBUILD intake provisioning (HTTP ${response.status}).`);
+    const body = await response.json() as unknown;
+    const configured = intakeIsConfigured(body);
+    const pause = intakePauseFromStatus(body);
+    setIntakeConfigured(configured);
+    setServerPause(pause);
+    return { configured, pause };
   }, []);
 
   const loadServerDrafts = useCallback(async (token: string) => {
@@ -177,6 +266,20 @@ export function SharedDraftPanel<T>({
     }
     void loadServerDrafts(session.access_token);
   }, [session?.user.id, session?.access_token, loadServerDrafts]);
+
+  useEffect(() => {
+    if (!session) {
+      queueOwnerRef.current = '';
+      setQuoteQueue([]);
+      setQueueConnection({ paused: false });
+      setQueueLoadingError('');
+      setIntakeConfigured(null);
+      setServerPause({ paused: false });
+      return;
+    }
+    void reloadQuoteQueue(session.user.id);
+    void refreshIntakeProvisioning().catch(() => setIntakeConfigured(null));
+  }, [session?.user.id, reloadQuoteQueue, refreshIntakeProvisioning]);
 
   const matching = useMemo(
     () => drafts.find(item => item.project?.sourceId === project.sourceId) ?? null,
@@ -231,6 +334,197 @@ export function SharedDraftPanel<T>({
     if (failure) throw failure;
     if (!data.session) throw new Error('Sign in to use shared estimates.');
     return data.session.access_token;
+  };
+
+  const queueRevisionSnapshot = async (
+    quote: IssuedQuote<EstimatorProject<T>>,
+    token: string,
+    recover = false,
+  ) => {
+    if (!session) throw new Error('Sign in to queue the issued quote delivery.');
+    const key = `issued-quote:${session.user.id}:${quote.draftId}:${quote.revision}`;
+    const all = await loadAllIntakeRecords();
+    const alreadyQueued = all.filter(isIssuedQuoteDelivery).find(record => record.key === key);
+    if (alreadyQueued) {
+      const canonicalSourceKey = `${session.user.id}:${alreadyQueued.sourceId}`;
+      if (!alreadyQueued.issuedAt || alreadyQueued.sourceKey !== canonicalSourceKey) {
+        await saveIssuedQuoteDelivery({
+          ...alreadyQueued,
+          issuedAt: quote.issuedAt,
+          sourceKey: canonicalSourceKey,
+        });
+      }
+      await reloadQuoteQueue(session.user.id);
+      return;
+    }
+    const frozen = await requestJson<{
+      identityJson: unknown;
+      proposalJson: unknown;
+      takeoffJson: unknown;
+    }>(`/api/estimates/${encodeURIComponent(quote.draftId)}/revisions/${quote.revision}/delivery`, token);
+    const record = buildIssuedQuoteDelivery(frozen, { userId: session.user.id, slug }, quote);
+    // Persist frozen JSON and IDs before any HBUILD intake request can be attempted.
+    await persistIssuedQuoteDelivery(record);
+    await reloadQuoteQueue(session.user.id);
+    if (recover) {
+      setSyncMessage(`Revision ${quote.revision} was recovered from its immutable server snapshot and saved in this browser queue. No delivery was sent.`);
+    }
+  };
+
+  const checkHbuildSync = async () => {
+    if (!session || syncWorking) return;
+    setSyncWorking(true);
+    setSyncMessage('');
+    try {
+      const acquired = await withExclusiveQuoteSender(session.user.id, async () => {
+        try {
+          const intakeStatus = await refreshIntakeProvisioning();
+          if (!intakeStatus.configured) {
+            setSyncMessage('HBUILD intake is not provisioned. Issued quote deliveries remain queued locally; no intake request was sent.');
+            return;
+          }
+          let all = await loadAllIntakeRecords();
+          let records = deliveriesForConnection(all, session.user.id);
+          setQuoteQueue(records);
+          const markers = all.filter(isQuoteQueueConnectionRecord)
+            .filter(record => record.userId === session.user.id && record.paused);
+          const paused = intakeStatus.pause.paused || markers.length > 0 || records.some(record => record.state === 'paused');
+          const pauseRetryAt = latestRetryDeadline([
+            intakeStatus.pause.retryAt,
+            ...markers.map(record => record.retryAt),
+            ...records.filter(record => record.state === 'paused').map(record => record.retryAt),
+          ]);
+          const plan = planManualSync(records, paused, pauseRetryAt);
+          if (plan.kind === 'empty') {
+            setSyncMessage('No pending issued-quote deliveries. Receipt-accepted revisions remain retained and unverified.');
+            return;
+          }
+          if (plan.kind === 'attention') {
+            setSyncMessage('The oldest pending issued-quote delivery needs attention. No newer delivery was sent.');
+            return;
+          }
+          if (plan.kind === 'wait') {
+            if (paused && !pauseRetryAt) {
+              const migratedPause = { paused: true as const, reason: 'estimator_sync_disabled' as const, retryAt: plan.retryAt };
+              await persistQuoteQueueConnection(session.user.id, migratedPause);
+              setQueueConnection(migratedPause);
+            }
+            setSyncMessage(`HBUILD sync is paused by the office. Manual probe is available after ${new Date(plan.retryAt).toLocaleString()}; no request was sent.`);
+            return;
+          }
+          const first = plan.next;
+          if (first.record.retryAt && !retryDeadlineExpired(first.record.retryAt)) {
+            setSyncMessage(`A temporary HBUILD response requested waiting until ${new Date(first.record.retryAt).toLocaleString()}. No request was sent.`);
+            return;
+          }
+
+          let probing = plan.kind === 'probe';
+          let halted = false;
+          const sendPart = async (
+            queued: IssuedQuoteDelivery,
+            part: 'identity' | 'proposal' | 'takeoff',
+          ) => {
+            const proposedSent = markDeliverySent(queued, part);
+            const sent = await saveIssuedQuoteDelivery(proposedSent);
+            all = await loadAllIntakeRecords();
+            records = deliveriesForConnection(all, session.user.id);
+            setQuoteQueue(records);
+            if (sent.state !== 'sent' || sent[`${part}Done`] || sent[`${part}Stale`] || sent[`${part}Attention`]) {
+              setSyncMessage('This queue item changed in another tab and was not sent. Reloaded durable queue progress safely.');
+              halted = true;
+              return { kind: 'attention' as const, message: 'Queue item changed concurrently.' };
+            }
+            const token = await tokenNow();
+            let status = 0;
+            let payload: unknown = null;
+            let retryAfterHeader: string | null = null;
+            try {
+              const response = await fetch(`/api/intake/${part === 'identity' ? 'projects' : 'documents'}`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+                body: sent[`${part}Json`],
+              });
+              status = response.status;
+              retryAfterHeader = response.headers.get('Retry-After');
+              try { payload = await response.json(); } catch { payload = null; }
+            } catch {
+              status = 0;
+            }
+            const decision = decideIntakeResponse({ status, body: payload, retryAfterHeader });
+            const transition = transitionAfterResponse(sent, part, decision);
+            await saveIssuedQuoteDelivery(transition.record);
+            all = await loadAllIntakeRecords();
+            records = deliveriesForConnection(all, session.user.id);
+            setQuoteQueue(records);
+
+            if (transition.connection) {
+              setQueueConnection(transition.connection);
+              await persistQuoteQueueConnection(session.user.id, transition.connection);
+              setSyncMessage('HBUILD sync paused by the office. Frozen deliveries remain queued; nothing was verified or released.');
+              halted = true;
+            } else if (decision.kind === 'transient') {
+              if (!probing) setQueueConnection({ paused: false });
+              setSyncMessage(`Temporary HBUILD response. This exact delivery is retained for a manual retry after ${transition.record.retryAt ? new Date(transition.record.retryAt).toLocaleString() : 'the retry-after period'}.`);
+              halted = true;
+            } else if (decision.kind === 'attention') {
+              setSyncMessage(`HBUILD needs attention: ${decision.message} This delivery will not be retried automatically.`);
+              halted = true;
+            } else if (decision.kind === 'accepted' || decision.kind === 'stale') {
+              if (probing) {
+                await persistQuoteQueueConnection(session.user.id, { paused: false });
+                for (const pausedRecord of records.filter(record => record.state === 'paused')) {
+                  await resumePausedIssuedQuoteDelivery(pausedRecord.key);
+                }
+                all = await loadAllIntakeRecords();
+                records = deliveriesForConnection(all, session.user.id);
+                setQuoteQueue(records);
+                setQueueConnection({ paused: false });
+                setServerPause({ paused: false });
+                probing = false;
+              }
+              setSyncMessage(decision.kind === 'stale'
+                ? `HBUILD marked revision ${transition.record.revision} ${part} stale. The frozen snapshot remains retained; no verification or release is implied.`
+                : `HBUILD accepted the ${part} receipt for revision ${transition.record.revision}; readback remains unverified.`);
+            }
+            return decision;
+          };
+
+          if (probing) {
+            const result = await sendPart(first.record, first.part);
+            if (result.kind !== 'accepted' && result.kind !== 'stale') halted = true;
+          }
+
+          // After a successful one-request probe, drain all modules in immutable quote-issued order.
+          while (!halted) {
+            const next = nextPendingDelivery(records);
+            if (!next) {
+              if (records.some(record => pendingDeliveryCount(record) > 0)) {
+                setSyncMessage('The oldest pending issued-quote delivery needs attention. No newer delivery was sent.');
+                halted = true;
+              }
+              break;
+            }
+            if (next.record.retryAt && !retryDeadlineExpired(next.record.retryAt)) {
+              setSyncMessage(`A temporary HBUILD response requested waiting until ${new Date(next.record.retryAt).toLocaleString()}. No later delivery was sent.`);
+              break;
+            }
+            await sendPart(next.record, next.part);
+          }
+          if (!halted && !nextPendingDelivery(records)) {
+            setSyncMessage('Queue check complete. Accepted receipts remain unverified and nothing has been released.');
+          }
+        } catch (failure) {
+          setSyncMessage(failure instanceof Error ? failure.message : 'Could not check the issued quote queue.');
+        }
+      });
+      if (!acquired) {
+        setSyncMessage('HBUILD queue sync is unavailable or already running in another tab. This browser fails closed without an exclusive sender lock.');
+      }
+    } catch (failure) {
+      setSyncMessage(failure instanceof Error ? failure.message : 'Could not claim the HBUILD sender lock.');
+    } finally {
+      setSyncWorking(false);
+    }
   };
 
   const loadServer = async (item: EstimateDraft<EstimatorProject<T>>) => {
@@ -305,6 +599,12 @@ export function SharedDraftPanel<T>({
         { expectedVersion: active.version },
       );
       setNotice(`Issued fixed quote revision ${quote.revision} from draft version ${quote.draftVersion}. BEFORE TAX ONLY; not tax-inclusive and not released to the client.`);
+      try {
+        await queueRevisionSnapshot(quote, token);
+        setNotice(previous => `${previous} Frozen delivery bodies and IDs are safely queued in this browser; sync has not been attempted.`);
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Quote issued, but its frozen delivery could not be queued. Use the revision recovery action.');
+      }
       await revisionsFor(active.id, token);
     } catch (failure) {
       const message = failure instanceof Error ? failure.message : 'Could not issue quote revision.';
@@ -372,8 +672,28 @@ export function SharedDraftPanel<T>({
     }
   };
 
+  const recoverRevision = async (quote: IssuedQuote<EstimatorProject<T>>) => {
+    setWorking(true);
+    setError('');
+    setSyncMessage('');
+    try {
+      const token = await tokenNow();
+      await queueRevisionSnapshot(quote, token, true);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not recover the frozen issued revision.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const serverDiverged = Boolean(matching && stableStringify(matching.project) !== stableStringify(project));
   const estimateMismatch = Boolean(active && (!serverCalculationMatches || !serverTotalsMatch));
+  const effectiveQueueConnection = useMemo(() => {
+    const retryAt = latestRetryDeadline([queueConnection.retryAt, serverPause.retryAt]);
+    return queueConnection.paused || serverPause.paused
+      ? { paused: true, reason: 'estimator_sync_disabled' as const, retryAt }
+      : { paused: false };
+  }, [queueConnection, serverPause]);
 
   return (
     <section className="rounded-xl border border-primary/25 bg-card/70 p-5 space-y-4" aria-labelledby={`${slug}-shared-title`}>
@@ -518,6 +838,10 @@ export function SharedDraftPanel<T>({
                         <Button type="button" variant="outline" size="sm" disabled={working} onClick={() => void downloadFixedPdf(quote, 'proposal')}>Download fixed proposal PDF</Button>
                         <Button type="button" variant="outline" size="sm" disabled={working} onClick={() => void downloadFixedPdf(quote, 'takeoff')}>Download fixed takeoff PDF</Button>
                         <Button type="button" variant="ghost" size="sm" disabled={working} onClick={() => void loadDelivery(quote)}>View frozen delivery</Button>
+                         <Button type="button" variant="outline" size="sm" disabled={working || queueLoadingError !== ''} onClick={() => void recoverRevision(quote)}>
+                           {quoteQueue.some(item => item.draftId === quote.draftId && item.revision === quote.revision)
+                             ? 'Confirm local queue copy' : 'Queue frozen delivery for recovery'}
+                         </Button>
                       </div>
                     </li>
                   ))}
@@ -540,6 +864,15 @@ export function SharedDraftPanel<T>({
               )}
             </div>
           )}
+          {queueLoadingError && <p className="text-sm text-destructive" role="alert">{queueLoadingError}</p>}
+          <IssuedQuoteQueuePanel
+            deliveries={quoteQueue}
+            connection={effectiveQueueConnection}
+            configured={intakeConfigured}
+            working={syncWorking || working}
+            syncMessage={syncMessage}
+            onCheckSync={() => void checkHbuildSync()}
+          />
         </div>
       )}
       {error && <div className="flex flex-wrap items-center gap-3" role="alert"><p className="text-sm text-destructive">{error}</p>

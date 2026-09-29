@@ -57,6 +57,14 @@ export const estimateDeliveriesTable = pgTable("estimator_quote_deliveries", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const estimatorIntakeConnectionsTable = pgTable("estimator_intake_connections", {
+  orgId: uuid("org_id").primaryKey(),
+  pausedUntil: timestamp("paused_until", { withTimezone: true }),
+  probeClaimedUntil: timestamp("probe_claimed_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type EstimateDraftRecord = typeof estimateDraftsTable.$inferSelect;
 export type IssuedQuoteRecord = typeof issuedQuotesTable.$inferSelect;
 export type EstimateDeliveryRecord = typeof estimateDeliveriesTable.$inferSelect;
+export type EstimatorIntakeConnectionRecord = typeof estimatorIntakeConnectionsTable.$inferSelect;

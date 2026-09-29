@@ -1,8 +1,19 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { DeliverIntakeProjectBody, DeliverIntakeDocumentBody } from "@workspace/api-zod";
 import { db, estimateDeliveriesTable, estimateDraftsTable, issuedQuotesTable } from "@workspace/db";
+import {
+  claimIntakePauseGate,
+  clearIntakePause,
+  persistIntakePause,
+  readIntakePauseStatus,
+} from "../lib/intakePause";
+import {
+  DEFAULT_PAUSE_RETRY_AFTER_SECONDS,
+  deliverSignedIntake,
+  type SignedIntakeResult,
+} from "../lib/signedIntake";
 import { allowedProjects, gatewayConfig, verifiedUser } from "./mesh";
 
 const router: IRouter = Router();
@@ -19,12 +30,13 @@ function intakeConfig() {
   const keyId = process.env.H_LEDGER_KEY_ID?.trim();
   const secret = process.env.H_LEDGER_SECRET?.trim();
   const staffIds = process.env.H_LEDGER_INTAKE_STAFF_USER_IDS?.split(",").map(id => id.trim()) ?? [];
-  if (!base?.startsWith("https://") || !keyId || !secret || !gatewayConfig() ||
+  const mesh = gatewayConfig();
+  if (!base?.startsWith("https://") || !keyId || !secret || !mesh ||
       !staffIds.length || staffIds.some(id => !uuid.test(id))) return null;
   try {
     const url = new URL(base);
     if (url.username || url.password || url.search || url.hash) return null;
-    return { url, keyId, secret, staffIds };
+    return { url, keyId, secret, staffIds, orgId: mesh.orgId };
   } catch { return null; }
 }
 
@@ -90,52 +102,86 @@ function matchesFrozenDocument(
   });
 }
 
-async function deliver(
+function sendDeliveryError(res: Response, result: Extract<SignedIntakeResult, { status: number }>) {
+  if (result.retryAfterSeconds !== undefined)
+    res.set("Retry-After", String(result.retryAfterSeconds));
+  res.status(result.status).json({
+    error: result.error,
+    ...(result.paused ? { paused: true } : {}),
+    ...(result.reason ? { reason: result.reason } : {}),
+    ...(result.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: result.retryAfterSeconds }),
+  });
+}
+
+async function deliverForOrg(
+  orgId: string,
   config: NonNullable<ReturnType<typeof intakeConfig>>,
   endpoint: "projects" | "documents",
   deliveryId: string,
   payload: object,
-) {
-  const raw = JSON.stringify(payload);
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  // H Ledger's current convention uses the SHA256 hex *string* as the HMAC key.
-  const keyHash = createHash("sha256").update(config.secret).digest("hex");
-  const signature = createHmac("sha256", keyHash).update(`${timestamp}.${raw}`).digest("hex");
-  const url = new URL(`/api/intake/v1/${endpoint}`, config.url);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-hbuild-key": config.keyId,
-      "x-hbuild-timestamp": timestamp,
-      "x-hbuild-signature": signature,
-      "Idempotency-Key": deliveryId,
-    },
-    body: raw,
-    redirect: "error",
-    signal: AbortSignal.timeout(45_000),
-  });
-  const result = await response.json() as { ok?: unknown; data?: { outcome?: unknown }; error?: { code?: string } };
-  if (!response.ok || result.ok !== true) {
-    const conflict = response.status === 409 || result.error?.code === "conflict";
-    return { status: conflict ? 409 : response.status === 401 || response.status === 403 ? response.status :
-      response.status === 429 ? 429 : response.status === 400 || response.status === 422 ? 400 : 503,
-      error: conflict ? "H Ledger requires review of this mapping or delivery. No new job was created here." :
-        response.status === 401 || response.status === 403 ? "H Ledger denied the intake account; ask an administrator to review its grant." :
-          response.status === 429 ? "H Ledger is rate-limiting deliveries; retry later with this same saved delivery." :
-        response.status === 400 || response.status === 422 ? "H Ledger rejected this snapshot. Check the client and project details." :
-          "H Ledger intake is unavailable; this delivery can be retried." };
+  logStateError: (error: unknown) => void,
+): Promise<SignedIntakeResult> {
+  const gate = await claimIntakePauseGate(orgId);
+  if (gate.kind === "paused") {
+    return {
+      status: 503,
+      error: "H Ledger synchronization is paused by the office. Keep this delivery and retry after synchronization resumes.",
+      paused: true,
+      reason: "estimator_sync_disabled",
+      retryAfterSeconds: gate.retryAfterSeconds,
+    };
   }
-  if (result.data?.outcome !== "applied" && result.data?.outcome !== "stale") {
-    return { status: 503, error: "H Ledger returned an unrecognized receipt; check Ledger before retrying." };
+  if (gate.kind === "unavailable") {
+    return {
+      status: 503,
+      error: "Estimator intake state is unavailable; this delivery was not sent. Retry later.",
+    };
   }
-  if (result.data.outcome === "stale")
-    return { status: 409, error: "H Ledger reports an older source snapshot. Review the existing mapping/version before retrying." };
-  return { outcome: result.data.outcome };
+
+  const result = await deliverSignedIntake(config, endpoint, deliveryId, payload);
+  if ("error" in result && result.paused) {
+    try {
+      await persistIntakePause(
+        orgId,
+        result.retryAfterSeconds ?? DEFAULT_PAUSE_RETRY_AFTER_SECONDS,
+      );
+    } catch (error) {
+      logStateError(error);
+      return {
+        status: 503,
+        error: "H Ledger synchronization is paused, but this server could not save the organization pause state. Keep the delivery and retry later.",
+      };
+    }
+  } else if (gate.probe && !("error" in result)) {
+    try {
+      await clearIntakePause(orgId);
+    } catch (error) {
+      logStateError(error);
+      return {
+        status: 503,
+        error: "H Ledger returned a receipt, but this server could not clear its local pause state. Keep the delivery and retry later.",
+      };
+    }
+  }
+  return result;
 }
 
-router.get("/status", (_req, res) => {
-  res.json({ configured: Boolean(intakeConfig()) });
+router.get("/status", async (req, res): Promise<void> => {
+  const config = intakeConfig();
+  if (!config) {
+    res.json({ configured: false });
+    return;
+  }
+  try {
+    const pause = await readIntakePauseStatus(config.orgId);
+    res.json({ configured: true, ...(pause ?? {}) });
+  } catch (error) {
+    req.log.warn({ error }, "Unable to read estimator intake pause status");
+    res.status(503).json({
+      configured: true,
+      error: "Estimator intake pause status is unavailable.",
+    });
+  }
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
@@ -173,8 +219,10 @@ router.post("/projects", async (req, res): Promise<void> => {
       },
       expectedDocuments: expectedDocuments ?? ["proposal", "takeoff"],
     };
-    const result = await deliver(auth.intake, "projects", deliveryId, payload);
-    if ("error" in result) { res.status(result.status ?? 503).json({ error: result.error }); return; }
+    const result = await deliverForOrg(auth.orgId, auth.intake, "projects", deliveryId, payload,
+      error => req.log.warn({ error }, "Unable to update estimator intake pause state"));
+    if ("error" in result) { sendDeliveryError(res, result); return; }
+    if (result.replayed) res.set("Idempotent-Replayed", "true");
     res.json({ ...result, detail: "Identity receipt accepted by H Ledger. Confirm the imported project in Ledger." });
   } catch (error) {
     req.log.warn({ error }, "Ledger identity delivery failed");
@@ -222,8 +270,10 @@ router.post("/documents", async (req, res): Promise<void> => {
         contentBase64: encoded,
       },
     };
-    const result = await deliver(auth.intake, "documents", deliveryId, payload);
-    if ("error" in result) { res.status(result.status ?? 503).json({ error: result.error }); return; }
+    const result = await deliverForOrg(auth.orgId, auth.intake, "documents", deliveryId, payload,
+      error => req.log.warn({ error }, "Unable to update estimator intake pause state"));
+    if ("error" in result) { sendDeliveryError(res, result); return; }
+    if (result.replayed) res.set("Idempotent-Replayed", "true");
     res.json({ ...result, detail: "H Ledger accepted the document receipt. Verify its stored file and version in H Docs before release." });
   } catch (error) {
     req.log.warn({ error }, "Ledger document delivery failed");

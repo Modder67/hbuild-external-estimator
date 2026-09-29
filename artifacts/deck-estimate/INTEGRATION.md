@@ -12,21 +12,22 @@ material-takeoff PDF. Unresolved material rates, scope ownership or measurements
 appear as issues, and the displayed amount is a known-cost subtotal, not a
 complete quote. Tax jurisdiction is not configured.
 
-The new tabs reuse the existing guarded Ledger proxy with one source project
-identity per job. Basement does **not** create separate HBUILD projects for its
-child calculators. The provider namespace on the proxy is still
-`deck-estimate`; its UUID source IDs keep the jobs distinct across tabs.
-The three new tabs' PDF deliveries are blocked if their pricing/scope issues
-remain. All four tabs keep downloads available while intake is disabled.
+Flooring, Bathroom and Basement have browser-local drafts alongside
+staff-authenticated shared drafts with optimistic version checks. The server
+recalculates with versioned rates and policy before issuing immutable,
+before-tax revisions. Issued PDFs and their frozen delivery snapshots are
+stored privately by the estimator, not in H Docs. Basement uses one source
+project identity, not separate child projects. A preliminary download or issued
+revision is not a tax-inclusive contract, HBUILD import, or client release.
+The provider namespace on the proxy remains `deck-estimate`.
 
-These new drafts are browser-local, not synchronized or permission-controlled
-server records. The attached build prompts call for authoritative server
-recalculation, audited rate edits, immutable issued quote revisions and
-cross-device optimistic concurrency; those capabilities have **not** been
-built. Do not treat a downloaded preliminary PDF or workbook as an issued
-contract. The Home Depot bathroom package contents, unresolved door/carpet/tile
-rates, pan adjustment policy and Ledger's live response contract still need
-owner confirmation before production use.
+Deck still has browser-local authoring and exports; its old browser-generated
+intake payloads do not meet the server's issued-revision guard. It must not
+send them, even when Ledger delivery is provisioned. Deck issuance/authorized
+handoff remains an unresolved integration requirement. The Home Depot bathroom
+package contents, unresolved door/carpet/tile rates, pan adjustment policy and
+Ledger's live response contract still need owner confirmation before production
+use.
 
 The new-job workflow follows the attached HBUILD external-estimator intake contract.
 It does **not** write the shared database or H Docs directly. The old existing-project
@@ -71,20 +72,18 @@ Verify that envelope and the imported mapping/document status against the live
 owner implementation before enabling delivery. No credential was provisioned,
 no upstream PR was merged, and no live intake call was made here.
 
-The browser keeps the frozen JSON body, delivery key and independent per-output
-receipt flags in IndexedDB for manual retry. A retry uses the same body and key;
-a changed snapshot gets new keys only after the prior snapshot was fully
-acknowledged. A receipt is **not** readback evidence: until the real Ledger
-document/mapping status response is inspected and implemented, this client
-blocks revised snapshots after receipt rather than discarding the frozen PDF.
-Clearing browser storage can lose unsent PDFs; retain the source
-downloads until HBUILD confirms verified storage. Only a successful receipt is
-shown, not an assertion of readback verification or a release to clients.
-Separate generated client and project source IDs remain stable across revisions;
-the client ID can be reused explicitly for a returning client before delivery.
+The browser's IndexedDB queue retains immutable serialized delivery envelopes,
+delivery IDs and PDF bytes for manual retry; the original private issued PDFs
+and snapshots also remain on the estimator server. The HBUILD proxy accepts
+only envelopes matching an issued revision. An accepted receipt is **not** H
+Docs readback evidence: files remain available at the source until verified
+storage is confirmed. Clearing browser storage can lose unsent queue entries;
+requeue issued revisions from their server snapshot if necessary. Separate
+generated client and project source IDs remain stable across revisions; the
+client ID can be reused explicitly for a returning client before delivery.
 The signed upstream IDs use the fixed provider account namespace, never the
-signed-in staff user, so a retry by another approved staff member maps to the
-same identity.
+signed-in staff user. See [the queue state machine](SYNC_QUEUE.md) for paused
+delivery and recovery behavior.
 
 ## Staging acceptance before enabling
 

@@ -143,7 +143,7 @@ export function ModulePage<T>({
               onLoadProject={adoptProject}
               onLoadLocalProject={restoreLocal}
             />
-            <ModuleIntakePanel project={draft} calculation={result} estimatorType={title} deliveryPaused />
+            <ModuleIntakePanel project={draft} calculation={result} estimatorType={title} />
           </div>
           <aside className="lg:sticky lg:top-6 lg:self-start rounded-xl border border-primary/25 bg-card p-5 space-y-3">
             <h2 className="font-semibold">Known-cost summary</h2>

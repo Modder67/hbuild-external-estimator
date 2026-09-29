@@ -1,0 +1,91 @@
+te prompt: handle H LEDGER's paused synchronization in the EXTERNAL estimator
+ 
+Update the EXTERNAL estimator application (flooring/doors, bathroom and basement calculators and any
+other module that delivers to HBUILD) so it behaves correctly while H LEDGER's estimator
+synchronization is **temporarily disabled**, and resumes cleanly when it is re-enabled. This is an
+implementation specification for the estimator codebase, not a claim of working software. Reuse the
+estimator's existing stack, delivery queue and signing helper; do not rebuild them, recreate
+client/project creation inside HBUILD, or deploy as part of this task.
+ 
+## Required reading
+ 
+- [Signed intake contract](skills/estimation-calculators/references/intake-contract.md), including
+  its new "Synchronization paused" section — the authoritative response shapes.
+- [External HBUILD environment](skills/estimation-calculators/references/external-environment.md).
+- `skills/hbuild-external-estimator/SKILL.md` § "Synchronization temporarily disabled (2026-09-29)".
+## What H LEDGER now does (server facts, not to be changed from the estimator side)
+ 
+The switch `ledger.estimator_sync` is controlled by HBUILD staff and is OFF by default. While off:
+ 
+- Every signed delivery from an `estimator` provider account to `POST /api/intake/v1/projects` and
+  `POST /api/intake/v1/documents` — including replays of previously finished deliveries — returns
+  **HTTP 503** with `Retry-After: 3600` and this envelope:
+```json
+  { "ok": false,
+    "error": { "code": "temporarily_unavailable",
+               "message": "Estimator synchronization to H LEDGER is temporarily disabled by the office. Nothing was imported or changed. Keep this delivery in the estimator and retry it after synchronization is re-enabled.",
+               "retryable": true,
+               "details": { "reason": "estimator_sync_disabled", "setting": "ledger.estimator_sync" } },
+    "requestId": "…" }
+```
+ 
+  **Detect the paused state by `error.details.reason === "estimator_sync_disabled"`** — never by
+  matching message text. A 503 without that marker is an ordinary transient outage and keeps the
+  existing backoff behavior.
+- Nothing is imported, updated or replayed, and no receipt is stored, so a delivery refused while
+  paused applies **exactly once** when resent later with its original Idempotency-Key and body.
+  H LEDGER never replays anything by itself; resending is always the estimator's action.
+- Creating a new `estimator` provider account returns 409. Existing accounts, mappings, receipts and
+  everything already imported are kept; `401 "This provider account was revoked."` still means
+  revoked, which is a different, non-recoverable state — do not treat it as paused.
+## Requirements
+ 
+1. **Queue, never drop.** Deliveries stay in the estimator's durable outbound queue with their
+   original Idempotency-Key and exact signed body. On the paused marker, mark the delivery — and the
+   HBUILD connection as a whole — `paused`, not `failed`. Nothing is deleted, regenerated or re-keyed.
+2. **Stop the retry loop while paused.** Once the connection is paused, send no further deliveries.
+   At most one cheap probe (the oldest queued delivery) per `Retry-After` period, or a manual
+   "Check HBUILD sync" action; no exponential-retry hammering. Transient 503s without the marker and
+   429s keep the existing bounded backoff honoring `Retry-After`.
+3. **Honest UI.** Wherever the estimator shows HBUILD delivery state, show
+   "HBUILD sync paused by the office — N deliveries waiting" (with the queue count and the oldest
+   item's age). Remove or suppress any "connected", "synced" or "delivery failed" wording for this
+   state: paused is neither success nor an estimator error. Estimate authoring, pricing, revisions
+   and PDF generation are unaffected and keep working; new estimates queue locally.
+4. **No workarounds.** While paused, do not call any other HBUILD endpoint to get records in: no
+   manual client/project creation (retired, refuses 409), no new provider accounts (409), no unsigned
+   or alternate routes, no direct database access. Keep the account keyId/secret stored as they are.
+5. **Resume cleanly.** When a probe succeeds (or staff resume the connection), resend the queue in
+   original order — each project's identity delivery before its document deliveries — with the
+   original keys and bodies. Expect: previously finished deliveries replay
+   (`Idempotent-Replayed: true`); deliveries refused while paused apply once; superseded identity
+   deliveries may return `stale` when a newer revision was already sent (send the LATEST revision of
+   an estimate that changed while paused; drop only queue items your own newer queued revision of the
+   same source record supersedes, per the existing newer-wins rule). Retain source files until each
+   document's readback status is `verified`, as the contract already requires.
+6. **Distinguish terminal states.** `401` (bad signature or revoked account) and `409`
+   (reused key, different body) keep their existing handling — surfaced for attention, never blind-
+   retried — and never flip the connection into or out of `paused`.
+7. **Per-connection scope.** The pause applies to the HBUILD connection only. If the estimator
+   delivers to any other consumer, those paths are untouched.
+8. **Update estimator-side records.** Reflect the paused state machine
+   (`queued → sent → verified | stale | paused | needs-attention`) in the estimator's own integration
+   documentation, and note that while paused, NEW estimator records will not appear in HBUILD.
+## Testing (estimator side, no live HBUILD)
+ 
+Against a stub of the intake endpoints:
+- The paused marker pauses the connection: queued deliveries stay intact with their keys/bodies;
+  no further sends happen except one probe per Retry-After window; UI shows paused with the count.
+- A 503 WITHOUT the marker follows ordinary transient backoff and does not pause the connection.
+- Resume resends in order (identity first), handles `applied`, `Idempotent-Replayed: true` and
+  `stale` correctly, and sends each queued delivery at most once.
+- 401 revoked and 409 reused-key surface as attention states, distinct from paused.
+- Standalone flows (authoring, pricing, PDFs) run with the connection paused.
+Run the estimator's existing test suite and production build; fix failures without weakening checks.
+## Deliverables
+ 
+The implementation, concise test results, the updated estimator-side integration doc, and a one-page
+state-machine summary of the delivery queue. Report anything the contract above does not cover as an
+open question — do not invent HBUILD behavior. Do not deploy, and do not change anything inside
+HBUILD from this task: the switch, its restoration and the H LEDGER side are owned there
+(`skills/hbuild-external-estimator/SKILL.md` has the restoration steps).
