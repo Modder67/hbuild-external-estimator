@@ -84,8 +84,9 @@ function validateProject(project: unknown): project is Record<string, unknown> &
   }
   if (typeof project.email === "string" && project.email.trim() &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(project.email.trim())) return false;
-  if (typeof project.jobCode === "string" && project.jobCode.trim() &&
-      !/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/.test(project.jobCode.trim())) return false;
+  // Job codes are free-form on drafts (H DOCS keyed-folder rules apply only
+  // at H LEDGER delivery time, and are enforced there); just cap the length.
+  if (typeof project.jobCode === "string" && project.jobCode.length > 60) return false;
   for (const key of ["addressLine1", "addressLine2", "city", "region", "postalCode"]) {
     if (typeof project[key] === "string" && project[key].length > 500) return false;
   }

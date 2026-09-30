@@ -11,7 +11,7 @@ import * as zod from "zod";
  * @summary List shared organization estimate drafts
  */
 
-export const listEstimatesResponseDraftsItemProjectJobCodeMax = 20;
+export const listEstimatesResponseDraftsItemProjectJobCodeMax = 60;
 
 export const listEstimatesResponseDraftsItemProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -39,7 +39,6 @@ export const ListEstimatesResponse = zod.object({
         jobCode: zod
           .string()
           .max(listEstimatesResponseDraftsItemProjectJobCodeMax)
-          .regex(listEstimatesResponseDraftsItemProjectJobCodeRegExp)
           .optional(),
         projectName: zod
           .string()
@@ -72,7 +71,7 @@ export const ListEstimatesResponse = zod.object({
 /**
  * @summary Create a recalculated shared estimate draft
  */
-export const createEstimateBodyProjectJobCodeMax = 20;
+export const createEstimateBodyProjectJobCodeMax = 60;
 
 export const createEstimateBodyProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -96,7 +95,6 @@ export const CreateEstimateBody = zod.object({
     jobCode: zod
       .string()
       .max(createEstimateBodyProjectJobCodeMax)
-      .regex(createEstimateBodyProjectJobCodeRegExp)
       .optional(),
     projectName: zod.string().max(createEstimateBodyProjectProjectNameMax),
     salesperson: zod.string().optional(),
@@ -111,7 +109,7 @@ export const GetEstimateParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
-export const getEstimateResponseProjectJobCodeMax = 20;
+export const getEstimateResponseProjectJobCodeMax = 60;
 
 export const getEstimateResponseProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -137,7 +135,6 @@ export const GetEstimateResponse = zod.object({
     jobCode: zod
       .string()
       .max(getEstimateResponseProjectJobCodeMax)
-      .regex(getEstimateResponseProjectJobCodeRegExp)
       .optional(),
     projectName: zod.string().max(getEstimateResponseProjectProjectNameMax),
     salesperson: zod.string().optional(),
@@ -170,7 +167,7 @@ export const UpdateEstimateParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
-export const updateEstimateBodyProjectJobCodeMax = 20;
+export const updateEstimateBodyProjectJobCodeMax = 60;
 
 export const updateEstimateBodyProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -194,7 +191,6 @@ export const UpdateEstimateBody = zod.object({
     jobCode: zod
       .string()
       .max(updateEstimateBodyProjectJobCodeMax)
-      .regex(updateEstimateBodyProjectJobCodeRegExp)
       .optional(),
     projectName: zod.string().max(updateEstimateBodyProjectProjectNameMax),
     salesperson: zod.string().optional(),
@@ -202,7 +198,7 @@ export const UpdateEstimateBody = zod.object({
   }),
 });
 
-export const updateEstimateResponseProjectJobCodeMax = 20;
+export const updateEstimateResponseProjectJobCodeMax = 60;
 
 export const updateEstimateResponseProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -228,7 +224,6 @@ export const UpdateEstimateResponse = zod.object({
     jobCode: zod
       .string()
       .max(updateEstimateResponseProjectJobCodeMax)
-      .regex(updateEstimateResponseProjectJobCodeRegExp)
       .optional(),
     projectName: zod.string().max(updateEstimateResponseProjectProjectNameMax),
     salesperson: zod.string().optional(),
@@ -265,7 +260,7 @@ export const IssueEstimateBody = zod.object({
   expectedVersion: zod.number().min(1),
 });
 
-export const issueEstimateResponseProjectJobCodeMax = 20;
+export const issueEstimateResponseProjectJobCodeMax = 60;
 
 export const issueEstimateResponseProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -292,7 +287,6 @@ export const IssueEstimateResponse = zod.object({
     jobCode: zod
       .string()
       .max(issueEstimateResponseProjectJobCodeMax)
-      .regex(issueEstimateResponseProjectJobCodeRegExp)
       .optional(),
     projectName: zod.string().max(issueEstimateResponseProjectProjectNameMax),
     salesperson: zod.string().optional(),
@@ -325,7 +319,7 @@ export const GetEstimateRevisionsParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
-export const getEstimateRevisionsResponseRevisionsItemProjectJobCodeMax = 20;
+export const getEstimateRevisionsResponseRevisionsItemProjectJobCodeMax = 60;
 
 export const getEstimateRevisionsResponseRevisionsItemProjectJobCodeRegExp =
   new RegExp("^$|^[A-Za-z0-9][A-Za-z0-9-]\*$");
@@ -353,7 +347,6 @@ export const GetEstimateRevisionsResponse = zod.object({
         jobCode: zod
           .string()
           .max(getEstimateRevisionsResponseRevisionsItemProjectJobCodeMax)
-          .regex(getEstimateRevisionsResponseRevisionsItemProjectJobCodeRegExp)
           .optional(),
         projectName: zod
           .string()
@@ -392,7 +385,7 @@ export const GetEstimateRevisionParams = zod.object({
   revision: zod.coerce.number().min(1),
 });
 
-export const getEstimateRevisionResponseProjectJobCodeMax = 20;
+export const getEstimateRevisionResponseProjectJobCodeMax = 60;
 
 export const getEstimateRevisionResponseProjectJobCodeRegExp = new RegExp(
   "^$|^[A-Za-z0-9][A-Za-z0-9-]\*$",
@@ -419,7 +412,6 @@ export const GetEstimateRevisionResponse = zod.object({
     jobCode: zod
       .string()
       .max(getEstimateRevisionResponseProjectJobCodeMax)
-      .regex(getEstimateRevisionResponseProjectJobCodeRegExp)
       .optional(),
     projectName: zod
       .string()
