@@ -15,6 +15,7 @@
     "prettier": "^3.8.1"
   },
   "dependencies": {
+    "@netlify/database": "^2.0.1",
     "serverless-http": "^3.2.0"
   }
 }

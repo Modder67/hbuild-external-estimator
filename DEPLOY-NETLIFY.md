@@ -16,15 +16,28 @@ login (create an empty private repo first, e.g. `Modder67/hbuild-external-estima
 
 ## 2. Provision the estimator's own database (NOT the mesh database)
 
-Any hosted Postgres (Neon, or a separate Supabase project's connection string). Create the tables
-with drizzle from this workspace:
+Default path — Netlify DB (Neon extension), no secrets handled by anyone:
+the Neon extension is installed on the site and `@netlify/database` is a root dependency, so a
+build provisions a Neon Postgres automatically and saves `NETLIFY_DATABASE_URL` (pooled) and
+`NETLIFY_DATABASE_URL_UNPOOLED` into the site's environment. `lib/db` accepts
+`NETLIFY_DATABASE_URL` as a fallback when `DATABASE_URL` is unset, and the build's final step
+(`node netlify/db-push.mjs`) applies the drizzle schema (`drizzle-kit push --force` — the schema
+is owned by this repo alone). If the variable was provisioned mid-build, the NEXT build applies
+the schema. IMPORTANT: claim the database into your own Neon account within a week
+(Site → Extensions → Neon → "Claim database"), or it is deleted.
+
+Manual alternative — any hosted Postgres (your own Neon project, or a separate Supabase
+project's connection string), tables created with drizzle from this workspace:
 
     cd lib/db
     DATABASE_URL="<the estimator database url>" pnpm run push
 
-This creates/updates `estimator_drafts`, `estimator_issued_quotes`, `estimator_quote_deliveries`,
-`estimator_intake_connections` and the new `estimator_private_pdfs`. Do not point this at the
-HBUILD mesh database: the estimator is external and owns its own records.
+Then set `DATABASE_URL` on the site (marked secret); it takes precedence over
+`NETLIFY_DATABASE_URL`.
+
+Either way this creates/updates `estimator_drafts`, `estimator_issued_quotes`,
+`estimator_quote_deliveries`, `estimator_intake_connections` and `estimator_private_pdfs`. Do not
+point this at the HBUILD mesh database: the estimator is external and owns its own records.
 
 ## 3. Netlify site
 
@@ -38,7 +51,7 @@ Build-time:
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` — the Supabase project whose Auth signs staff in
 
 Function runtime (Site settings → Environment variables, all scopes):
-- `DATABASE_URL` — the estimator database from step 2
+- `DATABASE_URL` — only for the manual path in step 2 (Netlify DB sets `NETLIFY_DATABASE_URL` itself)
 - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` — same Auth project as the VITE_ pair
 - `ESTIMATOR_STAFF_USER_IDS` — comma-separated Supabase Auth user UUIDs allowed to author estimates
 - Leave `PRIVATE_OBJECT_DIR` UNSET (that selects the database PDF store)

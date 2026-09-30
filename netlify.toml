@@ -2,7 +2,7 @@
 # Build-time env the config requires: PORT=5173 (unused at build), BASE_PATH=/,
 # VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY. Server env: see DEPLOY-NETLIFY.md.
 [build]
-  command = "pnpm run typecheck && pnpm --filter @workspace/deck-estimate run build"
+  command = "pnpm run typecheck && pnpm --filter @workspace/deck-estimate run build && node netlify/db-push.mjs"
   publish = "artifacts/deck-estimate/dist/public"
 
 [functions]
