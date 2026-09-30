@@ -6,8 +6,16 @@ const { Pool } = pg;
 
 // DATABASE_URL (explicit) or NETLIFY_DATABASE_URL (injected by Netlify DB /
 // the Neon extension). The pooled URL is right for runtime connections.
+// The value is often pasted from a console snippet, so extract the URL from
+// any surrounding text (quotes, a `psql` prefix, a `DATABASE_URL=` prefix).
+function extractUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const match = /postgres(?:ql)?:\/\/[^\s"']+/.exec(raw);
+  return match ? match[0] : raw.trim() || undefined;
+}
+
 const connectionString =
-  process.env.DATABASE_URL ?? process.env.NETLIFY_DATABASE_URL;
+  extractUrl(process.env.DATABASE_URL) ?? extractUrl(process.env.NETLIFY_DATABASE_URL);
 
 if (!connectionString) {
   throw new Error(
