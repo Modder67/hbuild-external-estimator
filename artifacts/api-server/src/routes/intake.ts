@@ -14,7 +14,7 @@ import {
   deliverSignedIntake,
   type SignedIntakeResult,
 } from "../lib/signedIntake";
-import { allowedProjects, gatewayConfig, verifiedUser } from "./mesh";
+import { allowedProjects, bearerToken, gatewayConfig, verifiedUser } from "./mesh";
 
 const router: IRouter = Router();
 const MAX_PDF = 8 * 1024 * 1024;
@@ -51,9 +51,10 @@ async function authorized(req: Request) {
   const intake = intakeConfig();
   if (!mesh || !intake) return { status: 503, error: "H Ledger intake is not provisioned yet." } as const;
   const userId = await verifiedUser(req, mesh);
-  if (!userId) return { status: 401, error: "Sign in to send this job to HBUILD." } as const;
+  const accessToken = bearerToken(req);
+  if (!userId || !accessToken) return { status: 401, error: "Sign in to send this job to HBUILD." } as const;
   if (!intake.staffIds.includes(userId)) return { status: 403, error: "Your account is not approved for H Ledger intake." } as const;
-  const grants = await allowedProjects(mesh, userId);
+  const grants = await allowedProjects(mesh, { id: userId, accessToken });
   if ("error" in grants) return { status: grants.status, error: grants.error } as const;
   return { userId, orgId: mesh.orgId, intake } as const;
 }

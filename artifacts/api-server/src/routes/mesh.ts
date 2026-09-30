@@ -16,6 +16,12 @@ export function gatewayConfig() {
   return { gatewayUrl, credential, orgId: orgId!, supabaseUrl, publicKey };
 }
 
+/** The end user's Supabase access token from the request, if present. */
+export function bearerToken(req: Request): string | null {
+  const match = /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "");
+  return match ? match[1] : null;
+}
+
 export async function verifiedUser(req: Request, config: NonNullable<ReturnType<typeof gatewayConfig>>) {
   const match = /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "");
   if (!match) return null;
@@ -28,25 +34,42 @@ export async function verifiedUser(req: Request, config: NonNullable<ReturnType<
   return typeof user.id === "string" && uuid.test(user.id) ? user.id : null;
 }
 
-export async function allowedProjects(config: NonNullable<ReturnType<typeof gatewayConfig>>, userId: string) {
-  const result = await fetch(config.gatewayUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-hbuild-app": "deck-estimate",
-      "x-hbuild-app-credential": config.credential,
-      "x-hbuild-user": userId,
-    },
-    body: JSON.stringify({ target: "planner", action: "listProjects", orgId: config.orgId, payload: {} }),
-    signal: AbortSignal.timeout(15_000),
-    redirect: "error",
-  });
-  if (!result.ok) return { error: "Project gateway is unavailable.", status: 503 } as const;
-  const envelope = await result.json() as { ok?: boolean; data?: unknown; error?: { code?: string } };
-  if (!envelope.ok) {
-    const denied = envelope.error?.code === "not_granted" || envelope.error?.code === "not_member";
+export async function allowedProjects(
+  config: NonNullable<ReturnType<typeof gatewayConfig>>,
+  user: { id: string; accessToken: string },
+) {
+  let result: Response;
+  try {
+    result = await fetch(config.gatewayUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-hbuild-app": "deck-estimate",
+        "x-hbuild-app-credential": config.credential,
+        "x-hbuild-user": user.id,
+        // The gateway authenticates the END USER by their own access token;
+        // the app credential above authenticates this estimator. Without the
+        // bearer, every call is refused 401 before authorization begins.
+        authorization: `Bearer ${user.accessToken}`,
+      },
+      body: JSON.stringify({ target: "planner", action: "listProjects", orgId: config.orgId, payload: {} }),
+      signal: AbortSignal.timeout(15_000),
+      redirect: "error",
+    });
+  } catch (error) {
+    console.error("[mesh] gateway unreachable:", error instanceof Error ? error.message : error);
+    return { error: "Project gateway is unreachable.", status: 503 } as const;
+  }
+  let envelope: { ok?: boolean; data?: unknown; error?: { code?: string } } = {};
+  try { envelope = await result.json() as typeof envelope; } catch { /* non-JSON body */ }
+  if (!result.ok || !envelope.ok) {
+    const code = envelope.error?.code;
+    console.error(`[mesh] gateway refused planner.listProjects: http ${result.status}${code ? ` code=${code}` : ""}`);
+    const denied = code === "not_granted" || code === "not_member";
     return {
-      error: denied ? "Your account or this estimator does not have permission to list projects." : "Project lookup is unavailable.",
+      error: denied
+        ? "Your account or this estimator does not have permission to list projects."
+        : `Project gateway is unavailable (http ${result.status}${code ? `: ${code}` : ""}).`,
       status: denied ? 403 : 503,
     } as const;
   }
@@ -67,8 +90,9 @@ router.get("/mesh/projects", async (req, res): Promise<void> => {
   }
   try {
     const userId = await verifiedUser(req, config);
-    if (!userId) { res.status(401).json({ error: "Sign in to view projects." }); return; }
-    const result = await allowedProjects(config, userId);
+    const accessToken = bearerToken(req);
+    if (!userId || !accessToken) { res.status(401).json({ error: "Sign in to view projects." }); return; }
+    const result = await allowedProjects(config, { id: userId, accessToken });
     if ("error" in result) { res.status(result.status ?? 503).json({ error: result.error }); return; }
     res.json(result.projects);
   } catch (error) {
@@ -90,8 +114,9 @@ router.get("/mesh/projects/:id/details", async (req, res): Promise<void> => {
   }
   try {
     const userId = await verifiedUser(req, config);
-    if (!userId) { res.status(401).json({ error: "Sign in to view project details." }); return; }
-    const allowed = await allowedProjects(config, userId);
+    const accessToken = bearerToken(req);
+    if (!userId || !accessToken) { res.status(401).json({ error: "Sign in to view project details." }); return; }
+    const allowed = await allowedProjects(config, { id: userId, accessToken });
     if ("error" in allowed) { res.status(allowed.status ?? 503).json({ error: allowed.error }); return; }
     if (!allowed.projects.projects.some(p => p.id === id)) {
       res.status(404).json({ error: "This project is not available to your account." });

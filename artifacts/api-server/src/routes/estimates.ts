@@ -22,7 +22,7 @@ import {
   uniqueLines,
   type Calculation,
 } from "@workspace/estimator-core";
-import { allowedProjects, gatewayConfig, verifiedUser } from "./mesh";
+import { allowedProjects, bearerToken, gatewayConfig, verifiedUser } from "./mesh";
 import { deckProposalRows, deckTakeoffRows, proposalRows, readPrivatePdf, renderPdf, savePrivatePdf, sha256, takeoffRows } from "../lib/estimateDelivery";
 
 const router: IRouter = Router();
@@ -43,9 +43,10 @@ async function authorize(req: Request): Promise<Authorized | AuthorizationFailur
     return { error: "Estimator persistence is not provisioned for approved staff.", status: 503 };
   }
   const userId = await verifiedUser(req, config);
-  if (!userId) return { error: "Sign in to access estimator drafts.", status: 401 };
+  const accessToken = bearerToken(req);
+  if (!userId || !accessToken) return { error: "Sign in to access estimator drafts.", status: 401 };
   if (!staffIds.includes(userId)) return { error: "Your account is not approved for estimator persistence.", status: 403 };
-  const result = await allowedProjects(config, userId);
+  const result = await allowedProjects(config, { id: userId, accessToken });
   if ("error" in result) return { error: result.error ?? "Project gateway is unavailable.", status: result.status ?? 503 };
   // The gateway result establishes organization membership/app grant. Estimator
   // source IDs are locally generated and intentionally need not be planner IDs.
