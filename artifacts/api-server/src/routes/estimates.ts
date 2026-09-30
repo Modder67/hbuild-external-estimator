@@ -184,7 +184,13 @@ router.post("/estimates", async (req, res): Promise<void> => {
     if ("error" in auth) { res.status(auth.status).json({ error: auth.error }); return; }
     const parsed = CreateEstimateBody.safeParse(req.body);
     if (!parsed.success || !slugs.has(parsed.data.slug)) {
-      res.status(400).json({ error: "Provide a supported estimator slug and a valid project snapshot." }); return;
+      // Name the failing field so a rejected save says what to fix.
+      const issue = parsed.success ? null : parsed.error.issues[0];
+      res.status(400).json({
+        error: issue
+          ? `Cannot save this draft — ${issue.path.join(".") || "body"}: ${issue.message}`
+          : "Provide a supported estimator slug and a valid project snapshot.",
+      }); return;
     }
     const projectError = estimateProjectError(parsed.data.slug, parsed.data.project);
     if (projectError) { res.status(400).json({ error: projectError }); return; }
@@ -224,7 +230,12 @@ router.put("/estimates/:id", async (req, res): Promise<void> => {
     if ("error" in auth) { res.status(auth.status).json({ error: auth.error }); return; }
     const parsed = UpdateEstimateBody.safeParse(req.body);
     if (!parsed.success || !Number.isSafeInteger(parsed.data.expectedVersion) || parsed.data.expectedVersion < 1) {
-      res.status(400).json({ error: "Provide an expected version and valid project snapshot." }); return;
+      const issue = parsed.success ? null : parsed.error.issues[0];
+      res.status(400).json({
+        error: issue
+          ? `Cannot save this draft — ${issue.path.join(".") || "body"}: ${issue.message}`
+          : "Provide an expected version and valid project snapshot.",
+      }); return;
     }
     const current = await getDraft(param(req, "id") ?? "", auth);
     if (!current) { res.status(404).json({ error: "Estimate draft not found." }); return; }
