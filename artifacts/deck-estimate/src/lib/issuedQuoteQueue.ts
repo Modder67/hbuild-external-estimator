@@ -95,10 +95,15 @@ export function buildIssuedQuoteDelivery(
     identityJson: JSON.stringify(frozen.identityJson),
     proposalJson: JSON.stringify(frozen.proposalJson),
     takeoffJson: JSON.stringify(frozen.takeoffJson),
+    // Quote baseline part (tools brief §2): the server rebuilds the money
+    // payload from the immutable issued revision; the client sends only the
+    // identifiers plus a delivery id derived from the frozen identity one.
+    quoteJson: JSON.stringify({ sourceId, revision: quote.revision, deliveryId: `${deliveryId}-quote` }),
     issuedAt: quote.issuedAt,
     identityDone: false,
     proposalDone: false,
     takeoffDone: false,
+    quoteDone: false,
     state: 'queued',
     createdAt: now,
   };
@@ -116,7 +121,7 @@ export function deliveriesForConnection(
 }
 
 export function hasReceipts(record: IssuedQuoteDelivery): boolean {
-  return record.identityDone || record.proposalDone || record.takeoffDone;
+  return record.identityDone || record.proposalDone || record.takeoffDone || record.quoteDone === true;
 }
 
 function immutableIssueTime(record: IssuedQuoteDelivery): number {
@@ -134,9 +139,9 @@ export function supersedeOlderUnsent(
     if (record.sourceKey !== incoming.sourceKey || !Number.isFinite(recordAt) ||
         !Number.isFinite(incomingAt) || recordAt >= incomingAt ||
         record.state !== 'queued' || record.retryAt || record.lastError || hasReceipts(record) ||
-        record.identitySent || record.proposalSent || record.takeoffSent ||
-        record.identityStale || record.proposalStale || record.takeoffStale ||
-        record.identityAttention || record.proposalAttention || record.takeoffAttention) return record;
+        record.identitySent || record.proposalSent || record.takeoffSent || record.quoteSent ||
+        record.identityStale || record.proposalStale || record.takeoffStale || record.quoteStale ||
+        record.identityAttention || record.proposalAttention || record.takeoffAttention || record.quoteAttention) return record;
     return { ...record, state: 'superseded' };
   });
 }
@@ -160,7 +165,7 @@ export function supersedeIncomingIfNewerQueued(
   incoming: IssuedQuoteDelivery,
 ): IssuedQuoteDelivery {
   if (incoming.state !== 'queued' || hasReceipts(incoming) || incoming.identitySent ||
-      incoming.proposalSent || incoming.takeoffSent || incoming.retryAt || incoming.lastError) return incoming;
+      incoming.proposalSent || incoming.takeoffSent || incoming.quoteSent || incoming.retryAt || incoming.lastError) return incoming;
   const incomingAt = immutableIssueTime(incoming);
   const newerQueued = Number.isFinite(incomingAt) && existing.some(record =>
     record.sourceKey === incoming.sourceKey &&
@@ -206,9 +211,15 @@ export function activeDeliveryRecords(records: IssuedQuoteDelivery[]): IssuedQuo
       a.key.localeCompare(b.key));
 }
 
-export function nextDeliveryPart(record: IssuedQuoteDelivery): 'identity' | 'proposal' | 'takeoff' | null {
+export type DeliveryPart = 'identity' | 'quote' | 'proposal' | 'takeoff';
+
+export function nextDeliveryPart(record: IssuedQuoteDelivery): DeliveryPart | null {
   if (record.identityStale) return null;
   if (!record.identityDone) return 'identity';
+  // The baseline rides right after identity so the money comparison exists
+  // even if a PDF later fails; records queued by older builds have no
+  // quoteJson and simply skip the part.
+  if (record.quoteJson && !record.quoteDone && !record.quoteStale) return 'quote';
   if (!record.proposalDone && !record.proposalStale) return 'proposal';
   if (!record.takeoffDone && !record.takeoffStale) return 'takeoff';
   return null;
@@ -217,6 +228,7 @@ export function nextDeliveryPart(record: IssuedQuoteDelivery): 'identity' | 'pro
 export function pendingDeliveryCount(record: IssuedQuoteDelivery): number {
   if (record.state === 'superseded' || record.state === 'stale' || record.state === 'receipts-accepted') return 0;
   return Number(!record.identityDone && !record.identityStale) +
+    Number(Boolean(record.quoteJson) && !record.quoteDone && !record.quoteStale) +
     Number(!record.proposalDone && !record.proposalStale) +
     Number(!record.takeoffDone && !record.takeoffStale);
 }
@@ -254,7 +266,7 @@ export function planManualSync(
 
 export function markDeliverySent(
   record: IssuedQuoteDelivery,
-  part: 'identity' | 'proposal' | 'takeoff',
+  part: DeliveryPart,
 ): IssuedQuoteDelivery {
   return { ...record, state: 'sent', [`${part}Sent`]: true };
 }
@@ -352,7 +364,7 @@ export function latestRetryDeadline(values: Array<string | undefined>): string |
 
 export function transitionAfterResponse(
   record: IssuedQuoteDelivery,
-  part: 'identity' | 'proposal' | 'takeoff',
+  part: DeliveryPart,
   decision: IntakeResponseDecision,
   now = Date.now(),
 ): { record: IssuedQuoteDelivery; connection?: QuoteQueueConnection } {
@@ -393,8 +405,9 @@ export function transitionAfterResponse(
   next[`${part}Done`] = true;
   next.retryAt = undefined;
   const allResolved = (next.identityDone || next.identityStale) &&
+    (!next.quoteJson || next.quoteDone || next.quoteStale) &&
     (next.proposalDone || next.proposalStale) && (next.takeoffDone || next.takeoffStale);
-  const hasStale = Boolean(next.identityStale || next.proposalStale || next.takeoffStale);
+  const hasStale = Boolean(next.identityStale || next.proposalStale || next.takeoffStale || next.quoteStale);
   if (allResolved && hasStale) {
     next.state = 'stale';
   } else if (allResolved) {

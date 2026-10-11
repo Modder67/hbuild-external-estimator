@@ -263,3 +263,65 @@ describe('issued quote queue state machine', () => {
     assert.equal(allResolved.proposalJson, record(3).proposalJson);
   });
 });
+describe('quote baseline part (tools brief §2)', () => {
+  const withQuote = (revision: number, overrides: Partial<IssuedQuoteDelivery> = {}) => record(revision, {
+    quoteJson: JSON.stringify({ sourceId: 'source', revision, deliveryId: `delivery-${revision}-quote` }),
+    quoteDone: false,
+    ...overrides,
+  });
+
+  it('rides immediately after identity, before the PDFs', () => {
+    const r = withQuote(1);
+    assert.equal(nextDeliveryPart(r), 'identity');
+    assert.equal(nextDeliveryPart({ ...r, identityDone: true }), 'quote');
+    assert.equal(nextDeliveryPart({ ...r, identityDone: true, quoteDone: true }), 'proposal');
+    assert.equal(nextDeliveryPart({ ...r, identityDone: true, quoteStale: true }), 'proposal');
+  });
+
+  it('a record queued by an older build has no quote body and simply skips the part', () => {
+    const legacy = record(1, { identityDone: true });
+    assert.equal(nextDeliveryPart(legacy), 'proposal');
+    assert.equal(queueSummary([record(1)]).count, 3, 'legacy records count three parts');
+    assert.equal(queueSummary([withQuote(1)]).count, 4, 'new records count four');
+  });
+
+  it('a PDF failure never blocks or rolls back the accepted baseline; all four parts resolve the record', () => {
+    let r = withQuote(2, { identityDone: true });
+    r = transitionAfterResponse(r, 'quote', { kind: 'accepted', replayed: false }).record;
+    assert.equal(r.quoteDone, true);
+    assert.equal(r.state, 'queued', 'PDFs still pending');
+    r = transitionAfterResponse(r, 'proposal', { kind: 'attention', message: 'bad pdf' }).record;
+    assert.equal(r.state, 'needs-attention');
+    assert.equal(r.quoteDone, true, 'the baseline receipt is retained');
+    let done = withQuote(3, { identityDone: true, quoteDone: true, proposalDone: true });
+    done = transitionAfterResponse(done, 'takeoff', { kind: 'accepted', replayed: false }).record;
+    assert.equal(done.state, 'receipts-accepted');
+  });
+
+  it('a stale quote part keeps the frozen snapshot and lets the PDFs continue', () => {
+    let r = withQuote(4, { identityDone: true });
+    r = transitionAfterResponse(r, 'quote', { kind: 'stale' }).record;
+    assert.equal(r.quoteStale, true);
+    assert.equal(r.state, 'queued');
+    assert.equal(nextDeliveryPart(r), 'proposal');
+  });
+
+  it('progress merge keeps quote receipts and refuses a different frozen quote body', () => {
+    const sent = withQuote(5, { quoteDone: true, state: 'sent' });
+    const other = withQuote(5);
+    const merged = mergeIssuedQuoteProgress(sent, other);
+    assert.equal(merged.quoteDone, true);
+    assert.throws(() => mergeIssuedQuoteProgress(sent, withQuote(5, {
+      quoteJson: JSON.stringify({ sourceId: 'source', revision: 5, deliveryId: 'tampered' }),
+    })), /different frozen request bodies/);
+    const legacyPrevious = record(5, { identityDone: true });
+    const upgraded = mergeIssuedQuoteProgress(legacyPrevious, withQuote(5));
+    assert.ok(upgraded.quoteJson, 'a legacy record adopts the quote body when a newer build re-persists it');
+  });
+
+  it('a record with only its quote receipt counts as having receipts (never superseded silently)', () => {
+    const r = withQuote(6, { identityDone: true, quoteDone: true });
+    const kept = supersedeOlderUnsent([r], withQuote(7, { issuedAt: new Date(7000).toISOString() }));
+    assert.equal(kept[0].state, 'queued', 'not superseded: it already holds a receipt');
+  });
+});

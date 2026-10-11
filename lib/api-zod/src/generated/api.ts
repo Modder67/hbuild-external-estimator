@@ -602,6 +602,17 @@ export const DeliverIntakeProjectResponse = zod.object({
  */
 export const deliverIntakeDocumentBodyDocumentContentBase64Max = 11184812;
 
+/**
+ * @summary Deliver the issued revision's quote baseline to H LEDGER
+ */
+export const DeliverIntakeQuoteBody = zod.object({
+  sourceId: zod.string().uuid(),
+  revision: zod.number().int().min(1).max(100000),
+  deliveryId: zod
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,100}$/, "16-100 letters, digits, - or _"),
+});
+
 export const DeliverIntakeDocumentBody = zod.object({
   sourceId: zod.string().uuid(),
   deliveryId: zod.string().uuid(),

@@ -48,7 +48,7 @@ function retryAfterSeconds(value: string | null, now = Date.now()): number | und
  */
 export async function deliverSignedIntake(
   config: SignedIntakeConfig,
-  endpoint: "projects" | "documents",
+  endpoint: "projects" | "documents" | "quotes",
   deliveryId: string,
   payload: object,
   fetcher: typeof fetch = fetch,

@@ -442,7 +442,7 @@ export function SharedDraftPanel<T>({
           let halted = false;
           const sendPart = async (
             queued: IssuedQuoteDelivery,
-            part: 'identity' | 'proposal' | 'takeoff',
+            part: 'identity' | 'quote' | 'proposal' | 'takeoff',
           ) => {
             const proposedSent = markDeliverySent(queued, part);
             const sent = await saveIssuedQuoteDelivery(proposedSent);
@@ -454,15 +454,22 @@ export function SharedDraftPanel<T>({
               halted = true;
               return { kind: 'attention' as const, message: 'Queue item changed concurrently.' };
             }
+            const partJson = sent[`${part}Json`];
+            if (!partJson) {
+              setSyncMessage('This queued delivery predates quote baselines and has no quote body; nothing was sent for that part.');
+              halted = true;
+              return { kind: 'attention' as const, message: 'Missing frozen request body for this part.' };
+            }
             const token = await tokenNow();
             let status = 0;
             let payload: unknown = null;
             let retryAfterHeader: string | null = null;
             try {
-              const response = await fetch(`/api/intake/${part === 'identity' ? 'projects' : 'documents'}`, {
+              const endpoint = part === 'identity' ? 'projects' : part === 'quote' ? 'quotes' : 'documents';
+              const response = await fetch(`/api/intake/${endpoint}`, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
-                body: sent[`${part}Json`],
+                body: partJson,
               });
               status = response.status;
               retryAfterHeader = response.headers.get('Retry-After');

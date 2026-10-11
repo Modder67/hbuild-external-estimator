@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { DeliverIntakeProjectBody, DeliverIntakeDocumentBody } from "@workspace/api-zod";
+import { DeliverIntakeProjectBody, DeliverIntakeDocumentBody, DeliverIntakeQuoteBody } from "@workspace/api-zod";
 import { db, estimateDeliveriesTable, estimateDraftsTable, issuedQuotesTable } from "@workspace/db";
 import {
   claimIntakePauseGate,
@@ -14,6 +14,7 @@ import {
   deliverSignedIntake,
   type SignedIntakeResult,
 } from "../lib/signedIntake";
+import { buildQuoteBaselinePayload } from "../lib/quoteBaseline";
 import { allowedProjects, bearerToken, gatewayConfig, verifiedUser } from "./mesh";
 
 const router: IRouter = Router();
@@ -117,7 +118,7 @@ function sendDeliveryError(res: Response, result: Extract<SignedIntakeResult, { 
 async function deliverForOrg(
   orgId: string,
   config: NonNullable<ReturnType<typeof intakeConfig>>,
-  endpoint: "projects" | "documents",
+  endpoint: "projects" | "documents" | "quotes",
   deliveryId: string,
   payload: object,
   logStateError: (error: unknown) => void,
@@ -227,6 +228,54 @@ router.post("/projects", async (req, res): Promise<void> => {
     res.json({ ...result, detail: "Identity receipt accepted by H Ledger. Confirm the imported project in Ledger." });
   } catch (error) {
     req.log.warn({ error }, "Ledger identity delivery failed");
+    res.status(503).json({ error: "H Ledger intake is unavailable; this delivery can be retried." });
+  }
+});
+
+
+/**
+ * Deliver the quote baseline for one immutable issued revision (tools brief
+ * §2, contract hbuild-quote-baseline-1). The money payload is rebuilt here
+ * from the stored revision — the client supplies only identifiers, so a
+ * tampered body can never change a delivered number. Same staff authorization
+ * and pause rules as every other Ledger delivery.
+ */
+router.post("/quotes", async (req, res): Promise<void> => {
+  const parsed = DeliverIntakeQuoteBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid quote baseline delivery." }); return; }
+  const { sourceId, revision, deliveryId } = parsed.data;
+  try {
+    const auth = await authorized(req);
+    if ("error" in auth) { res.status(auth.status ?? 503).json({ error: auth.error }); return; }
+    const [issued] = await db.select({
+      slug: estimateDraftsTable.slug,
+      totals: issuedQuotesTable.totals,
+      policyVersion: issuedQuotesTable.policyVersion,
+      rateBookVersion: issuedQuotesTable.rateBookVersion,
+      issuedAt: issuedQuotesTable.issuedAt,
+    }).from(estimateDraftsTable)
+      .innerJoin(issuedQuotesTable, eq(issuedQuotesTable.draftId, estimateDraftsTable.id))
+      .where(and(
+        eq(estimateDraftsTable.orgId, auth.orgId),
+        eq(estimateDraftsTable.sourceId, sourceId),
+        eq(issuedQuotesTable.revision, revision),
+      ));
+    if (!issued) {
+      res.status(404).json({ error: "No immutable issued revision matches that estimate and revision." }); return;
+    }
+    const built = buildQuoteBaselinePayload({
+      sourceId, revision, slug: issued.slug,
+      issuedAt: issued.issuedAt instanceof Date ? issued.issuedAt.toISOString() : String(issued.issuedAt),
+      totals: issued.totals, policyVersion: issued.policyVersion, rateBookVersion: issued.rateBookVersion,
+    });
+    if ("error" in built) { res.status(409).json({ error: built.error }); return; }
+    const result = await deliverForOrg(auth.orgId, auth.intake, "quotes", deliveryId, built.payload,
+      error => req.log.warn({ error }, "Unable to update estimator intake pause state"));
+    if ("error" in result) { sendDeliveryError(res, result); return; }
+    if (result.replayed) res.set("Idempotent-Replayed", "true");
+    res.json({ ...result, detail: "Quote baseline receipt accepted by H Ledger. Staff choose or confirm the comparison baseline there." });
+  } catch (error) {
+    req.log.warn({ error }, "Ledger quote baseline delivery failed");
     res.status(503).json({ error: "H Ledger intake is unavailable; this delivery can be retried." });
   }
 });

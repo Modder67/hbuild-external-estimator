@@ -24,19 +24,25 @@ export type IssuedQuoteDelivery = {
   identityJson: string;
   proposalJson: string;
   takeoffJson: string;
+  /** Quote-baseline request body (tools brief §2). Absent on records queued by older builds: that part is simply not sent. */
+  quoteJson?: string;
   issuedAt?: string;
   identityDone: boolean;
   proposalDone: boolean;
   takeoffDone: boolean;
+  quoteDone?: boolean;
   identitySent?: boolean;
   proposalSent?: boolean;
   takeoffSent?: boolean;
+  quoteSent?: boolean;
   identityStale?: boolean;
   proposalStale?: boolean;
   takeoffStale?: boolean;
+  quoteStale?: boolean;
   identityAttention?: string;
   proposalAttention?: string;
   takeoffAttention?: string;
+  quoteAttention?: string;
   resumeGeneration?: number;
   state: IssuedQuoteQueueState;
   createdAt: string;
@@ -185,6 +191,7 @@ export function mergeIssuedQuoteProgress(
       previous.identityJson !== incoming.identityJson ||
       previous.proposalJson !== incoming.proposalJson ||
       previous.takeoffJson !== incoming.takeoffJson ||
+      (previous.quoteJson !== undefined && incoming.quoteJson !== undefined && previous.quoteJson !== incoming.quoteJson) ||
       previous.deliveryId !== incoming.deliveryId ||
       (previous.issuedAt && incoming.issuedAt && previous.issuedAt !== incoming.issuedAt)) {
     throw new Error('Refusing to replace an issued quote queue key with different frozen request bodies or IDs.');
@@ -194,15 +201,20 @@ export function mergeIssuedQuoteProgress(
     identityDone: previous.identityDone || incoming.identityDone,
     proposalDone: previous.proposalDone || incoming.proposalDone,
     takeoffDone: previous.takeoffDone || incoming.takeoffDone,
+    quoteDone: previous.quoteDone || incoming.quoteDone,
     identitySent: previous.identitySent || incoming.identitySent,
     proposalSent: previous.proposalSent || incoming.proposalSent,
     takeoffSent: previous.takeoffSent || incoming.takeoffSent,
+    quoteSent: previous.quoteSent || incoming.quoteSent,
     identityStale: previous.identityStale || incoming.identityStale,
     proposalStale: previous.proposalStale || incoming.proposalStale,
     takeoffStale: previous.takeoffStale || incoming.takeoffStale,
+    quoteStale: previous.quoteStale || incoming.quoteStale,
     identityAttention: previous.identityAttention || incoming.identityAttention,
     proposalAttention: previous.proposalAttention || incoming.proposalAttention,
     takeoffAttention: previous.takeoffAttention || incoming.takeoffAttention,
+    quoteAttention: previous.quoteAttention || incoming.quoteAttention,
+    quoteJson: previous.quoteJson ?? incoming.quoteJson,
     resumeGeneration: Math.max(previous.resumeGeneration ?? 0, incoming.resumeGeneration ?? 0) || undefined,
     createdAt: previous.createdAt,
     issuedAt: previous.issuedAt || incoming.issuedAt,
@@ -214,13 +226,13 @@ export function mergeIssuedQuoteProgress(
     merged.retryAt = previous.retryAt;
     merged.lastError = previous.lastError;
   } else if (incoming.state === 'superseded' &&
-      (previous.identityDone || previous.proposalDone || previous.takeoffDone ||
-       previous.identitySent || previous.proposalSent || previous.takeoffSent ||
-       previous.identityStale || previous.proposalStale || previous.takeoffStale ||
-       previous.identityAttention || previous.proposalAttention || previous.takeoffAttention)) {
+      (previous.identityDone || previous.proposalDone || previous.takeoffDone || previous.quoteDone ||
+       previous.identitySent || previous.proposalSent || previous.takeoffSent || previous.quoteSent ||
+       previous.identityStale || previous.proposalStale || previous.takeoffStale || previous.quoteStale ||
+       previous.identityAttention || previous.proposalAttention || previous.takeoffAttention || previous.quoteAttention)) {
     merged.state = previous.state;
   } else if (previous.state === 'needs-attention' &&
-      !(incoming.identityAttention || incoming.proposalAttention || incoming.takeoffAttention)) {
+      !(incoming.identityAttention || incoming.proposalAttention || incoming.takeoffAttention || incoming.quoteAttention)) {
     merged.state = previous.state;
     merged.lastError = previous.lastError;
   } else if (previous.state === 'paused' && incoming.state === 'queued') {
